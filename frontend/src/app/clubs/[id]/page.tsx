@@ -73,9 +73,7 @@ export default function ClubProfile() {
         </div>
       </div>
 
-      {/* CONTENT LAYOUT */}
       <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-8 mt-16 p-6">
-        {/* FEED: POSTS SECTION */}
         <section className="md:col-span-8 space-y-6">
           <h2
             className="text-xl font-bold border-b pb-2"
