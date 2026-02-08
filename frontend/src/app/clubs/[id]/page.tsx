@@ -34,7 +34,6 @@ export default function ClubProfile() {
 
   const { club, posts } = data;
 
-  // DYNAMIC STYLES BASED ON DB COLORS
   const pageStyle = {
     backgroundColor: club.primary_color, // Use the Charcoal/Primary color
     minHeight: "100-vh",
@@ -50,7 +49,6 @@ export default function ClubProfile() {
 
   return (
     <main style={pageStyle} className="text-[#D7DADC] min-h-screen">
-      {/* HEADER BANNER */}
       <div
         className="h-48 w-full relative"
         style={{ backgroundColor: club.accent_color, opacity: 0.8 }}
@@ -116,7 +114,6 @@ export default function ClubProfile() {
           )}
         </section>
 
-        {/* SIDEBAR: ABOUT SECTION */}
         <section className="md:col-span-4 space-y-4">
           <div className="bg-[#1A1A1B] rounded-md border border-[#343536] overflow-hidden">
             <div
