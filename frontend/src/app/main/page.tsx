@@ -28,12 +28,42 @@ export default function Dashboard() {
 
   // Mock feed data
   const mockFeedItems = [
-    { id: 1, title: "Getting Started with Coding", author: "TechGuru", category: "Tech" },
-    { id: 2, title: "Design Tips for Beginners", author: "CreativeMinds", category: "Design" },
-    { id: 3, title: "Project Management Hacks", author: "ProductPro", category: "Business" },
-    { id: 4, title: "Advanced React Patterns", author: "CodeMaster", category: "Tech" },
-    { id: 5, title: "UI/UX Best Practices", author: "DesignerLife", category: "Design" },
-    { id: 6, title: "Leadership in Teams", author: "LeadOn", category: "Business" },
+    {
+      id: 1,
+      title: "Getting Started with Coding",
+      author: "TechGuru",
+      category: "Tech",
+    },
+    {
+      id: 2,
+      title: "Design Tips for Beginners",
+      author: "CreativeMinds",
+      category: "Design",
+    },
+    {
+      id: 3,
+      title: "Project Management Hacks",
+      author: "ProductPro",
+      category: "Business",
+    },
+    {
+      id: 4,
+      title: "Advanced React Patterns",
+      author: "CodeMaster",
+      category: "Tech",
+    },
+    {
+      id: 5,
+      title: "UI/UX Best Practices",
+      author: "DesignerLife",
+      category: "Design",
+    },
+    {
+      id: 6,
+      title: "Leadership in Teams",
+      author: "LeadOn",
+      category: "Business",
+    },
   ];
 
   useEffect(() => {
@@ -241,7 +271,9 @@ export default function Dashboard() {
                     <p className="text-xs font-bold text-white truncate">
                       u/{user.name}
                     </p>
-                    <p className="text-[11px] text-zinc-500 truncate">{user.email}</p>
+                    <p className="text-[11px] text-zinc-500 truncate">
+                      {user.email}
+                    </p>
                   </div>
                 </div>
                 <button className="text-[10px] bg-red-600 hover:bg-red-700 text-white font-bold px-2 py-1 rounded whitespace-nowrap ml-2">
