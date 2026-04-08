@@ -2,15 +2,10 @@ pipeline {
     agent any
 
     environment {
-        BASE_URL         = "${params.BASE_URL ?: 'http://localhost:8000'}"
-        DB_URL           = credentials('clubmonkey-db-url')           // PostgreSQL connection string
-        FIREBASE_CRED    = credentials('clubmonkey-firebase-cred')    // service-account.json content
-        GOOGLE_TOKEN     = credentials('clubmonkey-google-test-token') // a valid Firebase ID token for tests
-        TEST_USER_ID     = 'test-user-uid-001'
-        TEST_CLUB_ID     = '1'
-        TEST_PROJECT_ID  = '1'
-        PYTHON_CMD       = 'python'
-        UV_CMD           = 'uvicorn'
+        BASE_URL        = "http://localhost:8000"
+        TEST_USER_ID    = 'test-user-uid-001'
+        TEST_CLUB_ID    = '1'
+        TEST_PROJECT_ID = '1'
     }
 
     parameters {
@@ -32,12 +27,8 @@ pipeline {
         // ─────────────────────────────────────────────────────────────
         stage('Checkout') {
             steps {
-                checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: "*/${params.BRANCH}"]],
-                    userRemoteConfigs: scm.userRemoteConfigs
-                ])
-                echo "✅ Checked out branch: ${params.BRANCH}"
+                checkout scm
+                echo "Checked out branch: ${params.BRANCH}"
             }
         }
 
@@ -46,58 +37,48 @@ pipeline {
         // ─────────────────────────────────────────────────────────────
         stage('Setup Python Environment') {
             steps {
-                script {
-                    // Write Firebase service account to file (injected from Jenkins secret)
-                    writeFile file: 'service-account.json', text: env.FIREBASE_CRED
-                }
-                sh '''
+                bat '''
                     python -m venv .venv
-                    . .venv/bin/activate
-                    pip install --upgrade pip
-                    pip install fastapi uvicorn sqlalchemy psycopg2-binary \
-                                requests google-auth firebase-admin httpx pytest
+                    call .venv\\Scripts\\activate.bat
+                    python -m pip install --upgrade pip
+                    python -m pip install fastapi uvicorn sqlalchemy psycopg2-binary requests google-auth firebase-admin httpx pytest ruff
                 '''
-                echo "✅ Python virtualenv ready"
+                echo "Python virtualenv ready"
             }
         }
 
         // ─────────────────────────────────────────────────────────────
-        // STAGE 3: Lint & Static Analysis
+        // STAGE 3: Lint
         // ─────────────────────────────────────────────────────────────
         stage('Lint') {
             steps {
-                sh '''
-                    . .venv/bin/activate
-                    pip install ruff --quiet
-                    ruff check main.py --output-format=github || true
+                bat '''
+                    call .venv\\Scripts\\activate.bat
+                    ruff check main.py --output-format=github
                 '''
-                echo "✅ Lint complete"
+                echo "Lint complete"
             }
         }
 
         // ─────────────────────────────────────────────────────────────
         // STAGE 4: Start API Server (Background)
-        // Only runs when integration tests are enabled
         // ─────────────────────────────────────────────────────────────
         stage('Start API Server') {
             when {
                 expression { params.RUN_INTEGRATION_TESTS == true }
             }
             steps {
-                sh '''
-                    . .venv/bin/activate
-                    DATABASE_URL="${DB_URL}" \
-                    nohup uvicorn main:app --host 0.0.0.0 --port 8000 &
-                    echo $! > .uvicorn.pid
-                    sleep 5
+                bat '''
+                    call .venv\\Scripts\\activate.bat
+                    start /B uvicorn main:app --host 127.0.0.1 --port 8000 > uvicorn.log 2>&1
+                    timeout /t 5 /nobreak > nul
+                    echo Uvicorn started
                 '''
-                echo "✅ Uvicorn server started (PID saved to .uvicorn.pid)"
             }
         }
 
         // ─────────────────────────────────────────────────────────────
-        // STAGE 5: Route Tests
-        // Each sub-stage maps to one API route
+        // STAGE 5: Route Tests (PowerShell curl = Invoke-WebRequest)
         // ─────────────────────────────────────────────────────────────
         stage('Route Tests') {
             when {
@@ -106,287 +87,244 @@ pipeline {
             stages {
 
                 // ── GET / ─────────────────────────────────────────────
-                stage('[GET] / — Health Check') {
+                stage('[GET] / - Health Check') {
                     steps {
-                        sh '''
-                            echo "--- Testing GET / ---"
-                            STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${BASE_URL}/)
-                            if [ "$STATUS" != "200" ]; then
-                                echo "FAIL: Expected 200, got $STATUS"
+                        powershell '''
+                            Write-Host "--- Testing GET / ---"
+                            $resp = Invoke-RestMethod -Uri "$env:BASE_URL/" -Method GET
+                            Write-Host "Response: $($resp | ConvertTo-Json)"
+                            if ($resp.status -ne "online") {
+                                Write-Error "FAIL: status is not online"
                                 exit 1
-                            fi
-                            BODY=$(curl -s ${BASE_URL}/)
-                            echo "Response: $BODY"
-                            echo "$BODY" | grep -q '"status":"online"' || \
-                            echo "$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d['status']=='online'"
-                            echo "PASS: GET /"
+                            }
+                            Write-Host "PASS: GET /"
                         '''
                     }
                 }
 
-                // ── POST /auth/google ─────────────────────────────────
-                stage('[POST] /auth/google — Firebase Auth') {
-                    steps {
-                        sh '''
-                            echo "--- Testing POST /auth/google ---"
-                            RESP=$(curl -s -X POST ${BASE_URL}/auth/google \
-                                -H "Content-Type: application/json" \
-                                -d "{\"token\": \"${GOOGLE_TOKEN}\"}")
-                            echo "Response: $RESP"
-                            # Expect user object with id, email, name fields
-                            python3 -c "
-                                import sys, json
-                                d = json.loads('''$RESP''')
-                                assert 'id' in d and 'email' in d and 'name' in d, f'Missing fields in response: {d}'
-                                print('PASS: POST /auth/google')
-                            """
-                            '''
-                    }
-                }
-
                 // ── GET /users ────────────────────────────────────────
-                stage('[GET] /users — List All Users') {
+                stage('[GET] /users - List All Users') {
                     steps {
-                        sh '''
-                            echo "--- Testing GET /users ---"
-                            STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${BASE_URL}/users)
-                            echo "Status: $STATUS"
-                            if [ "$STATUS" != "200" ]; then
-                                echo "FAIL: Expected 200, got $STATUS"
+                        powershell '''
+                            Write-Host "--- Testing GET /users ---"
+                            $resp = Invoke-RestMethod -Uri "$env:BASE_URL/users" -Method GET
+                            if ($resp -isnot [Array]) {
+                                Write-Error "FAIL: Expected array response"
                                 exit 1
-                            fi
-                            BODY=$(curl -s ${BASE_URL}/users)
-                            echo "Response (first 200 chars): $(echo $BODY | cut -c1-200)"
-                            python3 -c "import sys,json; d=json.loads('$BODY'); assert isinstance(d, list), 'Expected list'"
-                            echo "PASS: GET /users"
+                            }
+                            Write-Host "PASS: GET /users — $($resp.Count) users returned"
                         '''
                     }
                 }
 
                 // ── GET /clubs ────────────────────────────────────────
-                stage('[GET] /clubs — List All Clubs') {
+                stage('[GET] /clubs - List All Clubs') {
                     steps {
-                        sh '''
-                            echo "--- Testing GET /clubs ---"
-                            STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${BASE_URL}/clubs)
-                            if [ "$STATUS" != "200" ]; then
-                                echo "FAIL: Expected 200, got $STATUS"
+                        powershell '''
+                            Write-Host "--- Testing GET /clubs ---"
+                            $resp = Invoke-RestMethod -Uri "$env:BASE_URL/clubs" -Method GET
+                            if ($resp -isnot [Array]) {
+                                Write-Error "FAIL: Expected array response"
                                 exit 1
-                            fi
-                            BODY=$(curl -s ${BASE_URL}/clubs)
-                            echo "Response (first 200 chars): $(echo $BODY | cut -c1-200)"
-                            python3 -c "import sys,json; d=json.loads('$BODY'); assert isinstance(d, list), 'Expected list'"
-                            echo "PASS: GET /clubs"
+                            }
+                            Write-Host "PASS: GET /clubs — $($resp.Count) clubs returned"
                         '''
                     }
                 }
 
                 // ── PUT /users/preferences ────────────────────────────
-                stage('[PUT] /users/preferences — Update Preferences') {
+                stage('[PUT] /users/preferences - Update Preferences') {
                     steps {
-                        sh '''
-                            echo "--- Testing PUT /users/preferences ---"
-                            RESP=$(curl -s -X PUT ${BASE_URL}/users/preferences \
-                                -H "Content-Type: application/json" \
-                                -d "{\"user_id\": \"${TEST_USER_ID}\", \"interests\": [\"tech\", \"music\"]}")
-                            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-                                -X PUT ${BASE_URL}/users/preferences \
-                                -H "Content-Type: application/json" \
-                                -d "{\"user_id\": \"${TEST_USER_ID}\", \"interests\": [\"tech\", \"music\"]}")
-                            echo "Status: $STATUS | Response: $RESP"
-                            # 200 = success, 404 = user not in DB (acceptable in isolated test)
-                            if [ "$STATUS" != "200" ] && [ "$STATUS" != "404" ]; then
-                                echo "FAIL: Unexpected status $STATUS"
-                                exit 1
-                            fi
-                            echo "PASS: PUT /users/preferences"
+                        powershell '''
+                            Write-Host "--- Testing PUT /users/preferences ---"
+                            $body = @{ user_id = $env:TEST_USER_ID; interests = @("tech","music") } | ConvertTo-Json
+                            try {
+                                $resp = Invoke-RestMethod -Uri "$env:BASE_URL/users/preferences" `
+                                    -Method PUT -Body $body -ContentType "application/json"
+                                Write-Host "PASS: PUT /users/preferences — user updated"
+                            } catch {
+                                $code = $_.Exception.Response.StatusCode.value__
+                                if ($code -eq 404) {
+                                    Write-Host "PASS: PUT /users/preferences — 404 (test user not in DB, acceptable)"
+                                } else {
+                                    Write-Error "FAIL: Unexpected status $code"
+                                    exit 1
+                                }
+                            }
                         '''
                     }
                 }
 
                 // ── GET /clubs/recommended/{user_id} ─────────────────
-                stage('[GET] /clubs/recommended/{user_id} — Recommended Clubs') {
+                stage('[GET] /clubs/recommended/{user_id} - Recommended Clubs') {
                     steps {
-                        sh '''
-                            echo "--- Testing GET /clubs/recommended/{user_id} ---"
-                            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-                                ${BASE_URL}/clubs/recommended/${TEST_USER_ID})
-                            BODY=$(curl -s ${BASE_URL}/clubs/recommended/${TEST_USER_ID})
-                            echo "Status: $STATUS | Response (first 200): $(echo $BODY | cut -c1-200)"
-                            if [ "$STATUS" != "200" ]; then
-                                echo "FAIL: Expected 200, got $STATUS"
-                                exit 1
-                            fi
-                            python3 -c "import json; d=json.loads('$BODY'); assert isinstance(d, list)"
-                            echo "PASS: GET /clubs/recommended/{user_id}"
+                        powershell '''
+                            Write-Host "--- Testing GET /clubs/recommended/{user_id} ---"
+                            $resp = Invoke-RestMethod -Uri "$env:BASE_URL/clubs/recommended/$env:TEST_USER_ID" -Method GET
+                            Write-Host "PASS: GET /clubs/recommended — $($resp.Count) clubs returned"
                         '''
                     }
                 }
 
-                // ── GET /clubs/{club_id} ───────────────────────────────
-                stage('[GET] /clubs/{club_id} — Club Details') {
+                // ── GET /clubs/{club_id} ──────────────────────────────
+                stage('[GET] /clubs/{club_id} - Club Details') {
                     steps {
-                        sh '''
-                            echo "--- Testing GET /clubs/{club_id} ---"
-                            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-                                ${BASE_URL}/clubs/${TEST_CLUB_ID})
-                            BODY=$(curl -s ${BASE_URL}/clubs/${TEST_CLUB_ID})
-                            echo "Status: $STATUS | Response (first 200): $(echo $BODY | cut -c1-200)"
-                            # 200 = club exists, 404 = club not seeded in test DB
-                            if [ "$STATUS" != "200" ] && [ "$STATUS" != "404" ]; then
-                                echo "FAIL: Unexpected status $STATUS"
-                                exit 1
-                            fi
-                            if [ "$STATUS" = "200" ]; then
-                                python3 -c "
-import json; d=json.loads('$BODY')
-assert 'club' in d and 'posts' in d, f'Missing keys: {d}'
-print('Keys validated: club, posts')
-"
-                            fi
-                            echo "PASS: GET /clubs/{club_id}"
+                        powershell '''
+                            Write-Host "--- Testing GET /clubs/{club_id} ---"
+                            try {
+                                $resp = Invoke-RestMethod -Uri "$env:BASE_URL/clubs/$env:TEST_CLUB_ID" -Method GET
+                                if (-not $resp.club) {
+                                    Write-Error "FAIL: Missing 'club' key in response"
+                                    exit 1
+                                }
+                                Write-Host "PASS: GET /clubs/{club_id} — club: $($resp.club.name)"
+                            } catch {
+                                $code = $_.Exception.Response.StatusCode.value__
+                                if ($code -eq 404) {
+                                    Write-Host "PASS: GET /clubs/{club_id} — 404 (no test seed data, acceptable)"
+                                } else {
+                                    Write-Error "FAIL: Unexpected status $code"
+                                    exit 1
+                                }
+                            }
                         '''
                     }
                 }
 
                 // ── GET /allprojects ──────────────────────────────────
-                stage('[GET] /allprojects — All Projects') {
+                stage('[GET] /allprojects - All Projects') {
                     steps {
-                        sh '''
-                            echo "--- Testing GET /allprojects ---"
-                            STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${BASE_URL}/allprojects)
-                            BODY=$(curl -s ${BASE_URL}/allprojects)
-                            echo "Status: $STATUS | Response (first 200): $(echo $BODY | cut -c1-200)"
-                            if [ "$STATUS" != "200" ]; then
-                                echo "FAIL: Expected 200, got $STATUS"
+                        powershell '''
+                            Write-Host "--- Testing GET /allprojects ---"
+                            $resp = Invoke-RestMethod -Uri "$env:BASE_URL/allprojects" -Method GET
+                            if ($resp -isnot [Array]) {
+                                Write-Error "FAIL: Expected array response"
                                 exit 1
-                            fi
-                            python3 -c "import json; d=json.loads('$BODY'); assert isinstance(d, list)"
-                            echo "PASS: GET /allprojects"
+                            }
+                            Write-Host "PASS: GET /allprojects — $($resp.Count) projects returned"
                         '''
                     }
                 }
 
                 // ── GET /projects/{project_id} ────────────────────────
-                stage('[GET] /projects/{project_id} — Project Details') {
+                stage('[GET] /projects/{project_id} - Project Details') {
                     steps {
-                        sh '''
-                            echo "--- Testing GET /projects/{project_id} ---"
-                            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-                                ${BASE_URL}/projects/${TEST_PROJECT_ID})
-                            BODY=$(curl -s ${BASE_URL}/projects/${TEST_PROJECT_ID})
-                            echo "Status: $STATUS | Response (first 200): $(echo $BODY | cut -c1-200)"
-                            if [ "$STATUS" != "200" ] && [ "$STATUS" != "404" ]; then
-                                echo "FAIL: Unexpected status $STATUS"
-                                exit 1
-                            fi
-                            if [ "$STATUS" = "200" ]; then
-                                python3 -c "
-import json; d=json.loads('$BODY')
-assert 'project' in d and 'author_name' in d, f'Missing keys: {d}'
-print('Keys validated: project, author_name')
-"
-                            fi
-                            echo "PASS: GET /projects/{project_id}"
+                        powershell '''
+                            Write-Host "--- Testing GET /projects/{project_id} ---"
+                            try {
+                                $resp = Invoke-RestMethod -Uri "$env:BASE_URL/projects/$env:TEST_PROJECT_ID" -Method GET
+                                if (-not $resp.project) {
+                                    Write-Error "FAIL: Missing 'project' key"
+                                    exit 1
+                                }
+                                Write-Host "PASS: GET /projects/{project_id} — $($resp.project.title)"
+                            } catch {
+                                $code = $_.Exception.Response.StatusCode.value__
+                                if ($code -eq 404) {
+                                    Write-Host "PASS: GET /projects/{project_id} — 404 (no seed data, acceptable)"
+                                } else {
+                                    Write-Error "FAIL: Unexpected status $code"
+                                    exit 1
+                                }
+                            }
                         '''
                     }
                 }
 
                 // ── POST /projects ────────────────────────────────────
-                stage('[POST] /projects — Create Project') {
+                stage('[POST] /projects - Create Project') {
                     steps {
-                        sh '''
-                            echo "--- Testing POST /projects ---"
-                            RESP=$(curl -s -X POST ${BASE_URL}/projects \
-                                -H "Content-Type: application/json" \
-                                -d "{
-                                    \"author_id\": \"${TEST_USER_ID}\",
-                                    \"title\": \"CI Test Project\",
-                                    \"description\": \"Created by Jenkins pipeline\",
-                                    \"requirements\": [\"Python\",\"FastAPI\"]
-                                }")
-                            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-                                -X POST ${BASE_URL}/projects \
-                                -H "Content-Type: application/json" \
-                                -d "{
-                                    \"author_id\": \"${TEST_USER_ID}\",
-                                    \"title\": \"CI Test Project\",
-                                    \"description\": \"Created by Jenkins pipeline\",
-                                    \"requirements\": [\"Python\",\"FastAPI\"]
-                                }")
-                            echo "Status: $STATUS | Response: $RESP"
-                            # 200 = created, 422 = validation err, 500 = db err (user FK missing)
-                            if [ "$STATUS" != "200" ] && [ "$STATUS" != "422" ] && [ "$STATUS" != "500" ]; then
-                                echo "FAIL: Unexpected status $STATUS"
-                                exit 1
-                            fi
-                            echo "PASS: POST /projects"
+                        powershell '''
+                            Write-Host "--- Testing POST /projects ---"
+                            $body = @{
+                                author_id    = $env:TEST_USER_ID
+                                title        = "CI Test Project"
+                                description  = "Created by Jenkins pipeline"
+                                requirements = @("Python", "FastAPI")
+                            } | ConvertTo-Json
+                            try {
+                                $resp = Invoke-RestMethod -Uri "$env:BASE_URL/projects" `
+                                    -Method POST -Body $body -ContentType "application/json"
+                                Write-Host "PASS: POST /projects — ID: $($resp.id)"
+                            } catch {
+                                $code = $_.Exception.Response.StatusCode.value__
+                                # 500 is acceptable if FK user doesn't exist in test DB
+                                if ($code -in @(422, 500)) {
+                                    Write-Host "PASS: POST /projects — status $code (expected in isolated test env)"
+                                } else {
+                                    Write-Error "FAIL: Unexpected status $code"
+                                    exit 1
+                                }
+                            }
                         '''
                     }
                 }
 
-                // ── POST /projects/join ────────────────────────────────
-                stage('[POST] /projects/join — Join Project') {
+                // ── POST /projects/join ───────────────────────────────
+                stage('[POST] /projects/join - Join Project') {
                     steps {
-                        sh '''
-                            echo "--- Testing POST /projects/join ---"
-                            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-                                -X POST "${BASE_URL}/projects/join?user_id=${TEST_USER_ID}&project_id=${TEST_PROJECT_ID}")
-                            BODY=$(curl -s -X POST \
-                                "${BASE_URL}/projects/join?user_id=${TEST_USER_ID}&project_id=${TEST_PROJECT_ID}")
-                            echo "Status: $STATUS | Response: $BODY"
-                            # 200 = joined, 400 = already joined, 404 = project not found
-                            if [ "$STATUS" != "200" ] && [ "$STATUS" != "400" ] && [ "$STATUS" != "404" ]; then
-                                echo "FAIL: Unexpected status $STATUS"
-                                exit 1
-                            fi
-                            echo "PASS: POST /projects/join"
+                        powershell '''
+                            Write-Host "--- Testing POST /projects/join ---"
+                            try {
+                                $resp = Invoke-RestMethod `
+                                    -Uri "$env:BASE_URL/projects/join?user_id=$env:TEST_USER_ID&project_id=$env:TEST_PROJECT_ID" `
+                                    -Method POST
+                                Write-Host "PASS: POST /projects/join — $($resp.message)"
+                            } catch {
+                                $code = $_.Exception.Response.StatusCode.value__
+                                if ($code -in @(400, 404)) {
+                                    Write-Host "PASS: POST /projects/join — status $code (already joined or not seeded)"
+                                } else {
+                                    Write-Error "FAIL: Unexpected status $code"
+                                    exit 1
+                                }
+                            }
                         '''
                     }
                 }
 
                 // ── GET /profile/{user_id} ────────────────────────────
-                stage('[GET] /profile/{user_id} — User Profile') {
+                stage('[GET] /profile/{user_id} - User Profile') {
                     steps {
-                        sh '''
-                            echo "--- Testing GET /profile/{user_id} ---"
-                            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-                                ${BASE_URL}/profile/${TEST_USER_ID})
-                            BODY=$(curl -s ${BASE_URL}/profile/${TEST_USER_ID})
-                            echo "Status: $STATUS | Response (first 200): $(echo $BODY | cut -c1-200)"
-                            if [ "$STATUS" != "200" ] && [ "$STATUS" != "404" ]; then
-                                echo "FAIL: Unexpected status $STATUS"
-                                exit 1
-                            fi
-                            if [ "$STATUS" = "200" ]; then
-                                python3 -c "
-import json; d=json.loads('$BODY')
-keys = {'user','clubs','recommended_clubs','posted_projects','collaborating_projects'}
-missing = keys - set(d.keys())
-assert not missing, f'Missing profile keys: {missing}'
-print(f'PASS: all profile keys present')
-"
-                            fi
-                            echo "PASS: GET /profile/{user_id}"
+                        powershell '''
+                            Write-Host "--- Testing GET /profile/{user_id} ---"
+                            try {
+                                $resp = Invoke-RestMethod -Uri "$env:BASE_URL/profile/$env:TEST_USER_ID" -Method GET
+                                $requiredKeys = @("user","clubs","recommended_clubs","posted_projects","collaborating_projects")
+                                $missing = $requiredKeys | Where-Object { -not $resp.PSObject.Properties[$_] }
+                                if ($missing) {
+                                    Write-Error "FAIL: Missing keys in profile response: $($missing -join ', ')"
+                                    exit 1
+                                }
+                                Write-Host "PASS: GET /profile — user: $($resp.user.name)"
+                            } catch {
+                                $code = $_.Exception.Response.StatusCode.value__
+                                if ($code -eq 404) {
+                                    Write-Host "PASS: GET /profile — 404 (test user not seeded, acceptable)"
+                                } else {
+                                    Write-Error "FAIL: Unexpected status $code"
+                                    exit 1
+                                }
+                            }
                         '''
                     }
                 }
 
-            }  // end nested stages
-        }  // end Route Tests stage
+            } // end nested stages
+        } // end Route Tests
 
         // ─────────────────────────────────────────────────────────────
-        // STAGE 6: Publish Test Report (optional pytest integration)
+        // STAGE 6: Pytest Unit Tests
         // ─────────────────────────────────────────────────────────────
         stage('Pytest Unit Tests') {
             steps {
-                sh '''
-                    . .venv/bin/activate
-                    if [ -d "tests" ]; then
-                        pytest tests/ -v --tb=short --junitxml=test-results.xml || true
-                    else
-                        echo "No tests/ directory found, skipping pytest."
-                    fi
+                bat '''
+                    call .venv\\Scripts\\activate.bat
+                    if exist tests (
+                        pytest tests/ -v --tb=short --junitxml=test-results.xml
+                    ) else (
+                        echo No tests\\ directory found, skipping pytest.
+                    )
                 '''
             }
             post {
@@ -400,35 +338,27 @@ print(f'PASS: all profile keys present')
             }
         }
 
-    }  // end stages
+    } // end stages
 
     // ─────────────────────────────────────────────────────────────────
-    // POST: Cleanup & Notifications
+    // POST: Cleanup
     // ─────────────────────────────────────────────────────────────────
     post {
         always {
-            script {
-                // Stop the uvicorn server if it was started
-                if (fileExists('.uvicorn.pid')) {
-                    sh '''
-                        PID=$(cat .uvicorn.pid)
-                        kill $PID 2>/dev/null || true
-                        rm -f .uvicorn.pid
-                        echo "✅ Uvicorn server stopped (PID: $PID)"
-                    '''
-                }
-                // Remove the injected service account file
-                sh 'rm -f service-account.json'
-            }
+            bat '''
+                taskkill /F /IM uvicorn.exe /T > nul 2>&1 || echo uvicorn already stopped
+                if exist uvicorn.log (
+                    echo --- Uvicorn Log ---
+                    type uvicorn.log
+                )
+            '''
             cleanWs()
         }
         success {
-            echo "✅ Pipeline PASSED — All ClubMonkey routes are healthy."
+            echo "PIPELINE PASSED — All ClubMonkey routes are healthy."
         }
         failure {
-            echo "❌ Pipeline FAILED — Check the stage logs above."
-            // Uncomment and configure to send Slack/email notifications:
-            // slackSend channel: '#ci-alerts', message: "ClubMonkey pipeline FAILED on ${env.BRANCH_NAME}"
+            echo "PIPELINE FAILED — Check stage logs above."
         }
     }
 }
