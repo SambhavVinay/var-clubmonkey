@@ -110,13 +110,33 @@ Add:  Name=PYTHON_EXE   Value=<the path from above>
                 expression { params.RUN_INTEGRATION_TESTS == true }
             }
             steps {
-                bat '''
-                    start /B .venv\\Scripts\\uvicorn.exe main:app --host 127.0.0.1 --port 8000 > uvicorn.log 2>&1
-                    timeout /t 5 /nobreak > nul
-                    echo Uvicorn started
+                powershell '''
+                    $proc = Start-Process `
+                        -FilePath ".venv\\Scripts\\uvicorn.exe" `
+                        -ArgumentList @("main:app", "--host", "127.0.0.1", "--port", "8000") `
+                        -RedirectStandardOutput "uvicorn.log" `
+                        -RedirectStandardError "uvicorn_err.log" `
+                        -PassThru -NoNewWindow
+                    $proc.Id | Out-File ".uvicorn.pid" -Encoding ascii
+                    Write-Host "Uvicorn started — PID: $($proc.Id)"
+                    Start-Sleep -Seconds 6
+
+                    # Show startup log so any crash is visible
+                    if (Test-Path "uvicorn.log")   { Write-Host "--- uvicorn stdout ---"; Get-Content "uvicorn.log" }
+                    if (Test-Path "uvicorn_err.log") { Write-Host "--- uvicorn stderr ---"; Get-Content "uvicorn_err.log" }
+
+                    # Verify it is actually listening
+                    try {
+                        $r = Invoke-RestMethod -Uri "http://127.0.0.1:8000/" -Method GET -TimeoutSec 5
+                        Write-Host "Health check OK: $($r | ConvertTo-Json -Compress)"
+                    } catch {
+                        Write-Error "Uvicorn health check failed — server did not start. Check logs above."
+                        exit 1
+                    }
                 '''
             }
         }
+
 
         // ─────────────────────────────────────────────────────────────
         // STAGE 5: Route Tests (PowerShell curl = Invoke-WebRequest)
