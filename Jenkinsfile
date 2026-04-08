@@ -38,10 +38,9 @@ pipeline {
         stage('Setup Python Environment') {
             steps {
                 bat '''
-                    python -m venv .venv
-                    call .venv\\Scripts\\activate.bat
-                    python -m pip install --upgrade pip
-                    python -m pip install fastapi uvicorn sqlalchemy psycopg2-binary requests google-auth firebase-admin httpx pytest ruff
+                    py -m venv .venv
+                    .venv\\Scripts\\python.exe -m pip install --upgrade pip
+                    .venv\\Scripts\\python.exe -m pip install fastapi uvicorn sqlalchemy psycopg2-binary requests google-auth firebase-admin httpx pytest ruff
                 '''
                 echo "Python virtualenv ready"
             }
@@ -53,8 +52,7 @@ pipeline {
         stage('Lint') {
             steps {
                 bat '''
-                    call .venv\\Scripts\\activate.bat
-                    ruff check main.py --output-format=github
+                    .venv\\Scripts\\ruff.exe check main.py --output-format=github
                 '''
                 echo "Lint complete"
             }
@@ -69,8 +67,7 @@ pipeline {
             }
             steps {
                 bat '''
-                    call .venv\\Scripts\\activate.bat
-                    start /B uvicorn main:app --host 127.0.0.1 --port 8000 > uvicorn.log 2>&1
+                    start /B .venv\\Scripts\\uvicorn.exe main:app --host 127.0.0.1 --port 8000 > uvicorn.log 2>&1
                     timeout /t 5 /nobreak > nul
                     echo Uvicorn started
                 '''
@@ -319,11 +316,10 @@ pipeline {
         stage('Pytest Unit Tests') {
             steps {
                 bat '''
-                    call .venv\\Scripts\\activate.bat
                     if exist tests (
-                        pytest tests/ -v --tb=short --junitxml=test-results.xml
+                        .venv\\Scripts\\pytest.exe tests/ -v --tb=short --junitxml=test-results.xml
                     ) else (
-                        echo No tests\\ directory found, skipping pytest.
+                        echo No tests\ directory found, skipping pytest.
                     )
                 '''
             }
