@@ -319,7 +319,7 @@ pipeline {
                     if exist tests (
                         .venv\\Scripts\\pytest.exe tests/ -v --tb=short --junitxml=test-results.xml
                     ) else (
-                        echo No tests\ directory found, skipping pytest.
+                        echo No tests directory found, skipping pytest.
                     )
                 '''
             }
