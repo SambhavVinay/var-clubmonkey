@@ -15,7 +15,7 @@ pipeline {
     }
 
     options {
-        timeout(time: 15, unit: 'MINUTES')
+        timeout(time: 30, unit: 'MINUTES')
         buildDiscarder(logRotator(numToKeepStr: '10'))
         timestamps()
     }
@@ -77,16 +77,27 @@ pipeline {
         stage('Start API Server') {
             when { expression { params.RUN_INTEGRATION_TESTS == true } }
             steps {
+                // Launch uvicorn fully detached so Jenkins does not hold a process handle.
+                // cmd /c start /B creates a new detached process group on Windows.
+                bat '''
+                    start /B "" ".venv\\Scripts\\uvicorn.exe" main:app --host 127.0.0.1 --port 8000 > uvicorn.log 2> uvicorn_err.log
+                '''
+                // Give the server a few seconds to initialise, then health-check it.
                 powershell '''
-                    $proc = Start-Process -FilePath ".venv\\Scripts\\uvicorn.exe" -ArgumentList "main:app", "--host", "127.0.0.1", "--port", "8000" -RedirectStandardOutput "uvicorn.log" -RedirectStandardError "uvicorn_err.log" -PassThru -NoNewWindow
-                    $proc.Id | Out-File ".uvicorn.pid" -Encoding ascii
-                    Write-Host "Uvicorn PID: $($proc.Id)"
-                    Start-Sleep -Seconds 6
+                    $ProgressPreference = "SilentlyContinue"
+                    $deadline = (Get-Date).AddSeconds(30)
+                    $ok = $false
+                    while ((Get-Date) -lt $deadline) {
+                        Start-Sleep -Seconds 2
+                        try {
+                            $r = Invoke-WebRequest -Uri "http://127.0.0.1:8000/" -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
+                            if ($r.StatusCode -eq 200) { $ok = $true; break }
+                        } catch { <# still starting #> }
+                    }
                     if (Test-Path "uvicorn.log")     { Write-Host "=== stdout ==="; Get-Content "uvicorn.log" }
                     if (Test-Path "uvicorn_err.log") { Write-Host "=== stderr ==="; Get-Content "uvicorn_err.log" }
-                    $r = Invoke-WebRequest -Uri "http://127.0.0.1:8000/" -UseBasicParsing -ErrorAction SilentlyContinue -TimeoutSec 10
-                    if ($null -eq $r -or $r.StatusCode -ne 200) { Write-Error "Server health check failed"; exit 1 }
-                    Write-Host "Server OK: $($r.StatusCode)"
+                    if (-not $ok) { Write-Error "Server did not become healthy within 30 s"; exit 1 }
+                    Write-Host "Server OK — ready for tests"
                 '''
             }
         }
@@ -97,25 +108,26 @@ pipeline {
 
                 stage('[GET] /') {
                     steps {
-                        powershell '$r = Invoke-RestMethod -Uri "$env:BASE_URL/" -Method GET -TimeoutSec 15; if ($r.status -ne "online") { Write-Error "FAIL"; exit 1 }; Write-Host "PASS: GET / — status=$($r.status)"'
+                        powershell '$ProgressPreference = "SilentlyContinue"; $r = Invoke-RestMethod -Uri "$env:BASE_URL/" -Method GET -TimeoutSec 15; if ($r.status -ne "online") { Write-Error "FAIL"; exit 1 }; Write-Host "PASS: GET /"'
                     }
                 }
 
                 stage('[GET] /users') {
                     steps {
-                        powershell '$r = Invoke-RestMethod -Uri "$env:BASE_URL/users" -Method GET -TimeoutSec 15; if ($r -isnot [Array]) { Write-Error "FAIL: not array"; exit 1 }; Write-Host "PASS: GET /users — $($r.Count) users"'
+                        powershell '$ProgressPreference = "SilentlyContinue"; $r = Invoke-RestMethod -Uri "$env:BASE_URL/users" -Method GET -TimeoutSec 15; if ($r -isnot [Array]) { Write-Error "FAIL: not array"; exit 1 }; Write-Host "PASS: GET /users — $($r.Count) users"'
                     }
                 }
 
                 stage('[GET] /clubs') {
                     steps {
-                        powershell '$r = Invoke-RestMethod -Uri "$env:BASE_URL/clubs" -Method GET -TimeoutSec 15; if ($r -isnot [Array]) { Write-Error "FAIL: not array"; exit 1 }; Write-Host "PASS: GET /clubs — $($r.Count) clubs"'
+                        powershell '$ProgressPreference = "SilentlyContinue"; $r = Invoke-RestMethod -Uri "$env:BASE_URL/clubs" -Method GET -TimeoutSec 15; if ($r -isnot [Array]) { Write-Error "FAIL: not array"; exit 1 }; Write-Host "PASS: GET /clubs — $($r.Count) clubs"'
                     }
                 }
 
                 stage('[PUT] /users/preferences') {
                     steps {
                         powershell '''
+                            $ProgressPreference = "SilentlyContinue"
                             $body = (@{ user_id = $env:TEST_USER_ID; interests = @("tech","music") } | ConvertTo-Json)
                             try { $r = Invoke-RestMethod -Uri "$env:BASE_URL/users/preferences" -Method PUT -Body $body -ContentType "application/json" -TimeoutSec 15; Write-Host "PASS: updated" }
                             catch { $c = $_.Exception.Response.StatusCode.value__; if ($c -eq 404) { Write-Host "PASS: 404 not seeded" } else { Write-Error "FAIL: $c"; exit 1 } }
@@ -125,13 +137,14 @@ pipeline {
 
                 stage('[GET] /clubs/recommended') {
                     steps {
-                        powershell '$r = Invoke-RestMethod -Uri "$env:BASE_URL/clubs/recommended/$env:TEST_USER_ID" -Method GET -TimeoutSec 15; Write-Host "PASS: GET /clubs/recommended — $($r.Count) clubs"'
+                        powershell '$ProgressPreference = "SilentlyContinue"; $r = Invoke-RestMethod -Uri "$env:BASE_URL/clubs/recommended/$env:TEST_USER_ID" -Method GET -TimeoutSec 15; Write-Host "PASS: GET /clubs/recommended — $($r.Count) clubs"'
                     }
                 }
 
                 stage('[GET] /clubs/{id}') {
                     steps {
                         powershell '''
+                            $ProgressPreference = "SilentlyContinue"
                             try { $r = Invoke-RestMethod -Uri "$env:BASE_URL/clubs/$env:TEST_CLUB_ID" -Method GET -TimeoutSec 15; Write-Host "PASS: $($r.club.name)" }
                             catch { $c = $_.Exception.Response.StatusCode.value__; if ($c -eq 404) { Write-Host "PASS: 404" } else { Write-Error "FAIL: $c"; exit 1 } }
                         '''
@@ -140,13 +153,14 @@ pipeline {
 
                 stage('[GET] /allprojects') {
                     steps {
-                        powershell '$r = Invoke-RestMethod -Uri "$env:BASE_URL/allprojects" -Method GET -TimeoutSec 15; if ($r -isnot [Array]) { Write-Error "FAIL: not array"; exit 1 }; Write-Host "PASS: GET /allprojects — $($r.Count) projects"'
+                        powershell '$ProgressPreference = "SilentlyContinue"; $r = Invoke-RestMethod -Uri "$env:BASE_URL/allprojects" -Method GET -TimeoutSec 15; if ($r -isnot [Array]) { Write-Error "FAIL: not array"; exit 1 }; Write-Host "PASS: GET /allprojects — $($r.Count) projects"'
                     }
                 }
 
                 stage('[GET] /projects/{id}') {
                     steps {
                         powershell '''
+                            $ProgressPreference = "SilentlyContinue"
                             try { $r = Invoke-RestMethod -Uri "$env:BASE_URL/projects/$env:TEST_PROJECT_ID" -Method GET -TimeoutSec 15; Write-Host "PASS: $($r.project.title)" }
                             catch { $c = $_.Exception.Response.StatusCode.value__; if ($c -eq 404) { Write-Host "PASS: 404" } else { Write-Error "FAIL: $c"; exit 1 } }
                         '''
@@ -156,6 +170,7 @@ pipeline {
                 stage('[POST] /projects') {
                     steps {
                         powershell '''
+                            $ProgressPreference = "SilentlyContinue"
                             $body = (@{ author_id = $env:TEST_USER_ID; title = "CI Test Project"; description = "Jenkins test"; requirements = @("Python","FastAPI") } | ConvertTo-Json)
                             try { $r = Invoke-RestMethod -Uri "$env:BASE_URL/projects" -Method POST -Body $body -ContentType "application/json" -TimeoutSec 15; Write-Host "PASS: created id=$($r.id)" }
                             catch { $c = $_.Exception.Response.StatusCode.value__; if ($c -in @(422,500)) { Write-Host "PASS: $c (FK not seeded)" } else { Write-Error "FAIL: $c"; exit 1 } }
@@ -166,6 +181,7 @@ pipeline {
                 stage('[POST] /projects/join') {
                     steps {
                         powershell '''
+                            $ProgressPreference = "SilentlyContinue"
                             try { $r = Invoke-RestMethod -Uri "$env:BASE_URL/projects/join?user_id=$env:TEST_USER_ID&project_id=$env:TEST_PROJECT_ID" -Method POST -TimeoutSec 15; Write-Host "PASS: $($r.message)" }
                             catch { $c = $_.Exception.Response.StatusCode.value__; if ($c -in @(400,404)) { Write-Host "PASS: $c" } else { Write-Error "FAIL: $c"; exit 1 } }
                         '''
@@ -175,6 +191,7 @@ pipeline {
                 stage('[GET] /profile/{id}') {
                     steps {
                         powershell '''
+                            $ProgressPreference = "SilentlyContinue"
                             try {
                                 $r = Invoke-RestMethod -Uri "$env:BASE_URL/profile/$env:TEST_USER_ID" -Method GET -TimeoutSec 15
                                 $missing = @("user","clubs","recommended_clubs","posted_projects","collaborating_projects") | Where-Object { -not $r.PSObject.Properties[$_] }
