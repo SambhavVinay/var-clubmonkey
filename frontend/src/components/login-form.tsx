@@ -8,6 +8,7 @@ import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { cn } from "@/lib/utils";
 import Grainient from "@/app/Grainient";
 import PixelBlast from "@/components/PixelBlast";
+import Aurora from "@/components/Aurora";
 import { Button } from "./button";
 import {
   Card,
@@ -149,6 +150,15 @@ export default function AuthPage({
         <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-[#0f0f1e] to-[#010208]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_30%,rgba(30,64,175,0.12)_0%,rgba(30,64,175,0)_40%),radial-gradient(circle_at_80%_15%,rgba(59,130,246,0.08)_0%,rgba(59,130,246,0)_45%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_62%_72%,rgba(167,139,250,0.12)_0%,rgba(167,139,250,0)_38%),radial-gradient(circle_at_24%_78%,rgba(96,165,250,0.09)_0%,rgba(96,165,250,0)_40%)]" />
+
+        <div className="absolute inset-0 opacity-45">
+          <Aurora
+            colorStops={["#8080ff", "#000080", "#ff0000"]}
+            blend={0.5}
+            amplitude={1.0}
+            speed={1}
+          />
+        </div>
 
         <div className="absolute inset-0 opacity-82">
           <PixelBlast
