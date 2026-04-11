@@ -220,7 +220,7 @@ const Page = () => {
 
         <div className="absolute inset-0 flex items-center">
           <div ref={tickerTrackRef} className="flex w-max items-center whitespace-nowrap pl-[12vw]">
-            <span className="ticker-word ticker-main text-[clamp(58px,9vw,150px)] font-light tracking-[0.06em] text-white/95" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+            <span className="ticker-word ticker-main text-[clamp(58px,9vw,150px)] font-light tracking-[0.06em] text-white/95">
               Club Monkey
             </span>
 
@@ -228,7 +228,7 @@ const Page = () => {
               <path d="M3 16C18 16 20 3 35 3C50 3 52 27 67 27C82 27 84 10 99 10H117" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
 
-            <span className="ticker-word mr-20 text-[clamp(46px,7vw,120px)] font-light tracking-[0.05em] text-blue-200/90" style={{ fontFamily: "Space Grotesk, sans-serif", animationDelay: "0.5s" }}>
+            <span className="ticker-word mr-20 text-[clamp(46px,7vw,120px)] font-light tracking-[0.05em] text-blue-200/90" style={{ animationDelay: "0.5s" }}>
               club
             </span>
 
@@ -236,7 +236,7 @@ const Page = () => {
               ✦
             </span>
 
-            <span className="ticker-word mr-28 text-[clamp(46px,7vw,120px)] font-light tracking-[0.05em] text-indigo-100/90" style={{ fontFamily: "Space Grotesk, sans-serif", animationDelay: "1.1s" }}>
+            <span className="ticker-word mr-28 text-[clamp(46px,7vw,120px)] font-light tracking-[0.05em] text-indigo-100/90" style={{ animationDelay: "1.1s" }}>
               collab
             </span>
 
@@ -244,13 +244,13 @@ const Page = () => {
               <path d="M3 12H77" stroke="currentColor" strokeWidth="1.6" strokeDasharray="3 6" strokeLinecap="round" />
             </svg>
 
-            <span className="ticker-word mr-24 text-[clamp(44px,6.5vw,112px)] font-light tracking-[0.05em] text-white/85" style={{ fontFamily: "Space Grotesk, sans-serif", animationDelay: "1.7s" }}>
+            <span className="ticker-word mr-24 text-[clamp(44px,6.5vw,112px)] font-light tracking-[0.05em] text-white/85" style={{ animationDelay: "1.7s" }}>
               and
             </span>
 
             <span className="ticker-accent mr-14 inline-flex h-10 w-10 items-center justify-center text-pink-200/75" style={{ animationDelay: "2s" }}>✺</span>
 
-            <span className="ticker-word mr-24 text-[clamp(52px,7.6vw,128px)] font-light tracking-[0.05em] text-violet-200/90" style={{ fontFamily: "Space Grotesk, sans-serif", animationDelay: "2.3s" }}>
+            <span className="ticker-word mr-24 text-[clamp(52px,7.6vw,128px)] font-light tracking-[0.05em] text-violet-200/90" style={{ animationDelay: "2.3s" }}>
               monke
             </span>
 
@@ -372,13 +372,13 @@ const Page = () => {
 
         <div className="relative z-[10] flex h-screen items-center px-16">
           <div className="flex max-w-2xl flex-col justify-center">
-            <h1 className="mb-6 text-[80px] font-light leading-none tracking-[0.1em] text-white" style={{ fontFamily: "Satoshi, sans-serif" }}>
+            <h1 className="mb-6 text-[80px] font-light leading-none tracking-[0.1em] text-white">
               Club Monkey
             </h1>
 
             <div className="mb-8 h-[1.5px] w-32 bg-gradient-to-r from-blue-400/80 to-transparent" />
 
-            <p className="mb-12 text-lg font-light tracking-[0.08em] text-blue-100/90" style={{ fontFamily: "Satoshi, sans-serif" }}>
+            <p className="mb-12 text-lg font-light tracking-[0.08em] text-blue-100/90">
               Collab, Create and Monke
             </p>
 
@@ -409,8 +409,6 @@ const Page = () => {
       </section>
 
       <style jsx global>{`
-        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
-        
         .star-twinkle {
           animation-name: twinkle;
           animation-timing-function: ease-in-out;
