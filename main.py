@@ -1,17 +1,18 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine, Column, String, Integer, Text, ForeignKey, JSON, DateTime
+from sqlalchemy import create_engine, Column, String, Integer, Text, ForeignKey, JSON, DateTime, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.sql import func
 from datetime import datetime
 from pydantic import BaseModel
 from typing import List, Optional
-from google.oauth2 import id_token
-from google.auth.transport import requests
+import os
+import firebase_admin
+from firebase_admin import auth as firebase_auth, credentials
  
-GOOGLE_CLIENT_ID = "293357637102-ddj6m9adt97cquei9ameuqirjks3tfju.apps.googleusercontent.com"
-DATABASE_URL = "postgresql+psycopg2://neondb_owner:npg_YrsM3yKIRxH0@ep-orange-cell-ah07255h-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "293357637102-ddj6m9adt97cquei9ameuqirjks3tfju.apps.googleusercontent.com")
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql+psycopg2://neondb_owner:npg_YrsM3yKIRxH0@ep-orange-cell-ah07255h-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require")
 engine = create_engine(
     DATABASE_URL,
     
@@ -30,6 +31,7 @@ class User(Base):
     email = Column(String, nullable=False, unique=True)
     image = Column(String)
     preferences = Column(JSON, server_default='[]')
+    is_admin = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class Club(Base):
@@ -78,7 +80,12 @@ app = FastAPI(title="ClubMonkey API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3001", 
+        "http://localhost:3000",
+        "http://127.0.0.1:3001",
+        "http://127.0.0.1:3000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -101,8 +108,10 @@ class UserSchema(BaseModel):
     email: str
     image: Optional[str] = None
     preferences: List[str] = []
+    is_admin: bool = False  # <--- CRITICAL: Add this so the frontend can see it
     created_at: datetime 
-    class Config: from_attributes = True
+    class Config:
+        from_attributes = True
 
  
 class UserCreate(BaseModel):
@@ -119,7 +128,8 @@ class ClubSchema(BaseModel):
     primary_color: str
     accent_color: str
     tags: List[str] = []
-    class Config: from_attributes = True
+    class Config:
+        from_attributes = True
 
 class PostSchema(BaseModel):
     id: int
@@ -127,7 +137,8 @@ class PostSchema(BaseModel):
     content: str
     image_url: Optional[str]
     created_at: datetime 
-    class Config: from_attributes = True
+    class Config:
+        from_attributes = True
 
 class PreferencesUpdate(BaseModel):
     user_id: str
@@ -137,47 +148,60 @@ class PreferencesUpdate(BaseModel):
 async def health_check():
     return {"status": "online", "timestamp": datetime.now()}
 
-import firebase_admin
-from firebase_admin import auth as firebase_auth, credentials
-
 # Initialize Firebase Admin (Only once)
 if not firebase_admin._apps:
     # Use default credentials or download service-account.json from Firebase Console
     cred = credentials.Certificate("service-account.json") 
     firebase_admin.initialize_app(cred)
 
+# Define the allowed admin emails at the top of your file
+ALLOWED_ADMIN_EMAILS = {"teamdopameme@gmail.com", "sambhavvinay20054@gmail.com"}
+
 @app.post("/auth/google", response_model=UserSchema)
 def google_auth(data: GoogleAuthRequest, db: Session = Depends(get_db)):
     try:
-        # Verify using Firebase Admin instead of generic Google library
+        # Verify using Firebase Admin
         decoded_token = firebase_auth.verify_id_token(data.token)
         
         google_id = decoded_token['uid']
-        email = decoded_token['email']
+        email = decoded_token['email'].lower() # Consistency is key
         name = decoded_token.get('name', 'User')
         picture = decoded_token.get('picture')
 
+        # Check whitelist
+        is_admin_user = email in ALLOWED_ADMIN_EMAILS
+
+        # Query existing user
         user = db.query(User).filter(User.email == email).first()
 
         if not user:
+            # Create new user
             user = User(
                 id=google_id,
                 name=name,
                 email=email,
                 image=picture,
-                preferences=[]
+                preferences=[],
+                is_admin=is_admin_user # Assign admin status on creation
             )
             db.add(user)
-            db.commit()
-            db.refresh(user)
+        else:
+            # IMPORTANT: Update admin status for existing users 
+            # in case they were added to the whitelist later
+            user.is_admin = is_admin_user
+        
+        db.commit()
+        db.refresh(user)
         
         return user
 
     except Exception as e:
         print(f"Auth Error: {e}")
+        # If it's failing here, it's a token verification issue. 
+        # Make sure your Firebase Admin 'service-account.json' matches your frontend Firebase Project.
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid Firebase Token"
+            detail=f"Invalid Firebase Token: {str(e)}"
         )
 
 
