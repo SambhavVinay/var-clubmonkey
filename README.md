@@ -62,3 +62,5 @@ copy .env.example .env
 copy frontend\.env.example frontend\.env
 ```
 
+made with ❤️ 
+
