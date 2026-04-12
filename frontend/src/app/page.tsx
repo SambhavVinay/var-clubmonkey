@@ -69,82 +69,29 @@ const Page = () => {
   };
 
   const stars = useMemo<Star[]>(() => {
-    return Array.from({ length: 350 }, (_, i) => {
+    return Array.from({ length: 180 }, (_, i) => { // Increased to 180
       const base = i + 1;
       return {
         left: pseudoRandom(base * 1.37) * 100,
         top: pseudoRandom(base * 2.11) * 100,
-        size: 0.4 + pseudoRandom(base * 3.07) * 2.8,
-        opacity: 0.2 + pseudoRandom(base * 4.21) * 0.8,
+        size: 0.6 + pseudoRandom(base * 3.07) * 2.2, // Increased size range
+        opacity: 0.3 + pseudoRandom(base * 4.21) * 0.6, // Higher base opacity for visibility
         delay: pseudoRandom(base * 5.29) * 10,
-        duration: 3 + pseudoRandom(base * 6.13) * 6,
+        duration: 4 + pseudoRandom(base * 6.13) * 6,
         color: STAR_COLORS[Math.floor(pseudoRandom(base * 7.41) * STAR_COLORS.length)],
       };
     });
   }, []);
 
-  const particles = useMemo<Particle[]>(() => {
-    return Array.from({ length: 40 }, (_, i) => ({
-      id: i,
-      left: pseudoRandom((i + 1) * 8.11) * 100,
-      top: pseudoRandom((i + 1) * 9.07) * 100,
-      size: 0.5 + pseudoRandom((i + 1) * 10.13) * 2.5,
-      duration: 18 + pseudoRandom((i + 1) * 11.19) * 12,
-      opacity: 0.08 + pseudoRandom((i + 1) * 12.23) * 0.25,
-      delay: pseudoRandom((i + 1) * 13.31) * 5,
-    }));
+  const particles = useMemo<Particle[]>(() => [], []); // Keep particles off for performance
+
+  useEffect(() => {
+    return () => {};
   }, []);
 
   useEffect(() => {
-    let timeoutId: number;
-
-    const spawnShootingStar = () => {
-      const now = Date.now();
-      const left = 15 + Math.random() * 70;
-      const top = 2 + Math.random() * 35;
-      const dx = 280 + Math.random() * 360;
-      const dy = 120 + Math.random() * 230;
-      const duration = 1.2 + Math.random() * 1.4;
-      const length = 130 + Math.random() * 130;
-      const brightness = 0.7 + Math.random() * 0.3;
-      const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-      const tint = METEOR_TINTS[Math.floor(Math.random() * METEOR_TINTS.length)];
-
-      setShootingStar({
-        id: now,
-        left,
-        top,
-        duration,
-        length,
-        dx,
-        dy,
-        brightness,
-        angle,
-        tint,
-      });
-
-      const nextDelay = 2000 + Math.random() * 5000;
-      timeoutId = window.setTimeout(spawnShootingStar, nextDelay);
-    };
-
-    spawnShootingStar();
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
+    return () => {};
   }, []);
-
-  useEffect(() => {
-    if (!shootingStar) return;
-
-    const timeoutId = window.setTimeout(() => {
-      setShootingStar((current) => (current?.id === shootingStar.id ? null : current));
-    }, shootingStar.duration * 1000 + 250);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [shootingStar]);
 
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger);
@@ -162,11 +109,12 @@ const Page = () => {
         {
           x: () => -getDistance(),
           ease: "none",
+          force3D: true, // Force GPU acceleration for the track
           scrollTrigger: {
             trigger: section,
             start: "top top",
             end: () => `+=${getDistance() + window.innerHeight * 0.75}`,
-            scrub: 1,
+            scrub: 0.5, // Reduced from 1 to 0.5 for more responsive feel
             pin: true,
             invalidateOnRefresh: true,
             anticipatePin: 1,
@@ -188,47 +136,42 @@ const Page = () => {
         }`}
       />
 
-      <section ref={tickerSectionRef} className="relative h-screen w-full overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-[#020410] via-[#010208] to-[#020410]" />
-        <div className="absolute inset-0 opacity-55 mix-blend-screen">
-          <Grainient
-            className="h-full w-full"
-            color1="#050b1d"
-            color2="#0c1f4e"
-            color3="#220f4a"
-            timeSpeed={0.16}
-            colorBalance={0}
-            warpStrength={0.33}
-            warpFrequency={7.2}
-            warpSpeed={2.4}
-            warpAmplitude={34}
-            blendAngle={0}
-            blendSoftness={0.16}
-            rotationAmount={370}
-            noiseScale={1.6}
-            grainAmount={0.03}
-            grainScale={2}
-            grainAnimated={false}
-            contrast={1.5}
-            gamma={0.9}
-            saturation={0.85}
-            centerX={0}
-            centerY={0}
-            zoom={0.96}
-          />
-        </div>
+      <section ref={tickerSectionRef} className="relative h-screen w-full overflow-hidden bg-[#010208]">
+        {/* Simple background with optimized stars */}
+        <div className="absolute inset-0 bg-[#010208]" />
 
-        <div className="absolute inset-0 flex items-center">
-          <div ref={tickerTrackRef} className="flex w-max items-center whitespace-nowrap pl-[12vw]">
-            <span className="ticker-word ticker-main text-[clamp(58px,9vw,150px)] font-light tracking-[0.06em] text-white/95">
+        {/* Starfield Background Layer (only stars, no gradients/shaders) */}
+        <div className="pointer-events-none absolute inset-0 z-[1] overflow-hidden">
+          {stars.map((star, index) => (
+            <span
+              key={index}
+              className="star-twinkle absolute rounded-full"
+              style={{
+                left: `${star.left}%`,
+                top: `${star.top}%`,
+                width: `${star.size}px`,
+                height: `${star.size}px`,
+                opacity: star.opacity,
+                ["--star-opacity" as string]: star.opacity,
+                animationDelay: `${star.delay}s`,
+                animationDuration: `${star.duration}s`,
+                backgroundColor: star.color,
+                // Removed complex box-shadow for performance
+              }}
+            />
+          ))}
+        </div>
+        
+        <div className="absolute inset-0 flex items-center z-[10]">
+          <div ref={tickerTrackRef} className="flex w-max items-center whitespace-nowrap pl-[12vw]" style={{ willChange: "transform" }}>
+            <span className="ticker-word ticker-main text-[clamp(58px,9vw,150px)] font-light tracking-[0.06em] text-white">
               Club Monkey
             </span>
 
-            <svg className="ticker-curve mx-12 h-10 w-28 text-blue-300/70" viewBox="0 0 120 30" fill="none" aria-hidden>
-              <path d="M3 16C18 16 20 3 35 3C50 3 52 27 67 27C82 27 84 10 99 10H117" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
+            {/* Replaced complex SVG with simple text/character to reduce path calculation */}
+            <span className="mx-12 text-blue-300/40 text-[50px]">~</span>
 
-            <span className="ticker-word mr-20 text-[clamp(46px,7vw,120px)] font-light tracking-[0.05em] text-blue-200/90" style={{ animationDelay: "0.5s" }}>
+            <span className="ticker-word mr-20 text-[clamp(46px,7vw,120px)] font-light tracking-[0.05em] text-blue-200/90">
               club
             </span>
 
@@ -248,22 +191,21 @@ const Page = () => {
               and
             </span>
 
-            <span className="ticker-accent mr-14 inline-flex h-10 w-10 items-center justify-center text-pink-200/75" style={{ animationDelay: "2s" }}>✺</span>
+            <span className="ticker-accent mr-14 inline-flex h-10 w-10 items-center justify-center text-pink-200/75">✺</span>
 
-            <span className="ticker-word mr-24 text-[clamp(52px,7.6vw,128px)] font-light tracking-[0.05em] text-violet-200/90" style={{ animationDelay: "2.3s" }}>
+            <span className="ticker-word mr-24 text-[clamp(52px,7.6vw,128px)] font-light tracking-[0.05em] text-violet-200/90">
               monke
             </span>
 
-            <svg className="ticker-curve mx-12 h-10 w-28 text-cyan-300/70" viewBox="0 0 120 30" fill="none" aria-hidden style={{ animationDelay: "2.8s" }}>
-              <path d="M3 14C20 14 18 5 35 5C52 5 50 25 67 25C84 25 82 8 99 8H117" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
+            <span className="mx-12 text-cyan-300/40 text-[50px]">~</span>
 
             <span className="inline-flex items-center pr-[45vw]">
-              <span className="ticker-accent relative h-[clamp(72px,8.2vw,122px)] w-[clamp(72px,8.2vw,122px)] overflow-hidden rounded-full border border-cyan-300/35 bg-[#050a1a]/80 shadow-[0_0_28px_rgba(96,165,250,0.3)]" style={{ animationDelay: "3.1s" }}>
+              <span className="ticker-accent relative h-[clamp(72px,8.2vw,122px)] w-[clamp(72px,8.2vw,122px)] overflow-hidden rounded-full border border-cyan-300/35 bg-black" style={{ transform: "translateZ(0)" }}>
                 <Image
                   src="/monkey-logo.jpeg"
                   alt="Monkey logo"
                   fill
+                  priority // Load the logo early
                   sizes="(max-width: 768px) 72px, 122px"
                   className="object-cover"
                 />
@@ -275,43 +217,14 @@ const Page = () => {
 
       <section className="relative min-h-screen w-full overflow-hidden bg-[#010208]">
         {/* Nebula Background Layers */}
-        <div className="absolute bottom-[-10%] left-[-10%] h-[50%] w-[60%] rounded-full bg-blue-900/25 pointer-events-none z-0 nebula-glow" />
-        <div className="absolute bottom-[-5%] right-[-5%] h-[40%] w-[50%] rounded-full bg-indigo-900/20 pointer-events-none z-0 nebula-glow" />
-        <div className="absolute bottom-[-20%] left-[20%] h-[60%] w-[70%] rounded-full bg-blue-600/15 pointer-events-none z-0 nebula-glow-deep" />
-        <div className="absolute top-[-15%] right-[10%] h-[45%] w-[40%] rounded-full bg-purple-900/15 pointer-events-none z-0 nebula-glow" />
+        <div className="absolute bottom-[-10%] left-[-10%] h-[50%] w-[60%] rounded-full bg-blue-900/15 pointer-events-none z-0 nebula-glow blur-[100px]" />
+        <div className="absolute bottom-[-5%] right-[-5%] h-[40%] w-[50%] rounded-full bg-indigo-900/10 pointer-events-none z-0 nebula-glow blur-[80px]" />
+        <div className="absolute top-[-15%] right-[10%] h-[45%] w-[40%] rounded-full bg-purple-900/10 pointer-events-none z-0 nebula-glow blur-[100px]" />
 
         {/* Starfield Background */}
         <div className="pointer-events-none absolute inset-0 z-[1]">
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-[#0f0f1e] to-[#010208]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_30%,rgba(30,64,175,0.12)_0%,rgba(30,64,175,0)_40%),radial-gradient(circle_at_80%_15%,rgba(59,130,246,0.08)_0%,rgba(59,130,246,0)_45%)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_62%_72%,rgba(167,139,250,0.12)_0%,rgba(167,139,250,0)_38%),radial-gradient(circle_at_24%_78%,rgba(96,165,250,0.09)_0%,rgba(96,165,250,0)_40%),radial-gradient(circle_at_74%_44%,rgba(244,114,182,0.08)_0%,rgba(244,114,182,0)_36%)]" />
-          <div className="absolute inset-0 opacity-72 mix-blend-screen">
-            <Grainient
-              className="h-full w-full"
-              color1="#060a1a"
-              color2="#0a1c45"
-              color3="#251048"
-              timeSpeed={0.2}
-              colorBalance={0}
-              warpStrength={0.4}
-              warpFrequency={7}
-              warpSpeed={2.9}
-              warpAmplitude={28}
-              blendAngle={0}
-              blendSoftness={0.1}
-              rotationAmount={420}
-              noiseScale={1.6}
-              grainAmount={0.04}
-              grainScale={2}
-              grainAnimated={false}
-              contrast={1.82}
-              gamma={0.78}
-              saturation={0.9}
-              centerX={0}
-              centerY={0}
-              zoom={0.9}
-            />
-          </div>
+          <div className="absolute inset-0 bg-gradient-to-b from-[#010208] via-[#0f0f1e] to-[#010208]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_30%,rgba(30,64,175,0.08)_0%,rgba(30,64,175,0)_50%),radial-gradient(circle_at_80%_15%,rgba(59,130,246,0.05)_0%,rgba(59,130,246,0)_50%)]" />
           <div className="absolute inset-0 cosmic-vignette" />
 
           {stars.map((star, index) => (
