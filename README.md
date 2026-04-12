@@ -54,3 +54,13 @@ Frontend runs at `http://localhost:3000`.
 - Keep `service-account.json` in project root for Firebase Admin verification.
 - If needed, set `NEXT_PUBLIC_API_BASE_URL` to your backend URL.
 
+### 4. Environment files
+Create local env files from examples (do not commit real secrets):
+
+```powershell
+copy .env.example .env
+copy frontend\.env.example frontend\.env
+```
+
+Both `.env` files are ignored by git, while `.env.example` files are committed.
+
