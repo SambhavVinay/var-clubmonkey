@@ -44,9 +44,13 @@ export default function RecommendedClubs() {
 
       <div className="grid grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-3">
         {clubs.map((club) => (
-          <div key={club.id} className="space-y-3">
+          <Link 
+            key={club.id} 
+            href={`/clubs/${club.id}`}
+            className="group/card block space-y-4 rounded-2xl border border-white/5 bg-white/[0.02] p-4 transition-all hover:border-white/10 hover:bg-white/[0.04]"
+          >
             <TiltedCard
-              imageSrc={getClubVisual(club)}
+              imageSrc={club.logo_url || getClubVisual(club)}
               altText={`${club.name} card`}
               captionText={club.name}
               captionStyle={getTooltipPillStyle(club)}
@@ -60,9 +64,11 @@ export default function RecommendedClubs() {
               showTooltip
               displayOverlayContent
               overlayContent={
-                <p className="tilted-card-demo-text" style={getTitlePillStyle(club)}>
-                  {club.name}
-                </p>
+                <div className="flex flex-col items-center">
+                   <p className="tilted-card-demo-text" style={getTitlePillStyle(club)}>
+                    {club.name}
+                  </p>
+                </div>
               }
             />
 
@@ -81,7 +87,7 @@ export default function RecommendedClubs() {
                 ))}
               </div>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
 

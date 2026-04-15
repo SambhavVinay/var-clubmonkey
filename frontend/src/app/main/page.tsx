@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Aurora from "@/components/Aurora";
+import { motion, AnimatePresence } from "motion/react";
 import Carousel, { type CarouselItem } from "@/components/Carousel";
 import TinyToast from "@/components/TinyToast";
 import PostCard from "@/components/PostCard";
@@ -22,6 +22,7 @@ interface User {
   name: string;
   email: string;
   image?: string;
+  preferences?: string[];
 }
 
 interface SearchSuggestion {
@@ -203,6 +204,23 @@ export default function Dashboard() {
 
   const displayPosts = activeFeedTab === "all" ? posts : fypPosts;
 
+  const similarPeers = useMemo(() => {
+    if (!currentUserId || !users.length) return [];
+    
+    // Find current user's preferences from the fetched users list
+    const currentUser = users.find(u => u.id === currentUserId);
+    const myPrefs = currentUser?.preferences || [];
+    
+    if (myPrefs.length === 0) return [];
+
+    return users.filter(user => {
+      if (user.id === currentUserId) return false;
+      if (!user.preferences || user.preferences.length === 0) return false;
+      // Intersection check
+      return user.preferences.some(pref => myPrefs.includes(pref));
+    });
+  }, [users, currentUserId]);
+
   const handleSelectSuggestion = (suggestion: SearchSuggestion) => {
     setSearchQuery(suggestion.label);
     setIsSearchFocused(false);
@@ -356,33 +374,29 @@ export default function Dashboard() {
       return next;
     });
   };
+  const [selectedPost, setSelectedPost] = useState<FeedPost | null>(null);
+
+  const closePostDetail = () => setSelectedPost(null);
 
   if (loading)
     return (
-      <div className="flex h-screen items-center justify-center bg-black text-zinc-400">
-        <div className="flex items-center gap-3 rounded-full border border-white/15 bg-white/5 px-5 py-2.5 backdrop-blur-sm">
-          <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
-          <span>Loading ClubMonkey...</span>
+      <div className="flex h-screen items-center justify-center bg-[#030303] text-zinc-400">
+        <div className="flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-5 py-2.5 backdrop-blur-sm">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-blue-500" />
+          <span className="text-xs font-bold uppercase tracking-widest">Initialising ClubMonkey...</span>
         </div>
       </div>
     );
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-black text-zinc-200">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_14%_10%,rgba(48,86,178,0.2),transparent_42%),radial-gradient(circle_at_90%_12%,rgba(86,64,146,0.14),transparent_38%),linear-gradient(180deg,#020207_0%,#070910_100%)]" />
-      <div className="pointer-events-none absolute inset-0 opacity-72 mix-blend-screen aurora-layer">
-        <Aurora
-          colorStops={["#23386a", "#080b1c", "#21143a"]}
-          blend={0.52}
-          amplitude={1.02}
-          speed={0.7}
-        />
-      </div>
-
-      <header className="sticky top-0 z-50 border-b border-white/12 bg-black/82 backdrop-blur-md">
+    <div className="relative min-h-screen bg-[#030303] text-zinc-200 overflow-x-hidden">
+      {/* Sleek industrial background grid */}
+      <div className="pointer-events-none fixed inset-0 z-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
+      
+      <header className="sticky top-0 z-50 border-b border-[#2d333b] bg-[#030303]/90 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-[1320px] items-center gap-4 px-4 md:px-6">
-          <div className="text-xl font-bold tracking-tight text-white">
-            <span>Club</span>Monkey
+          <div className="text-xl font-black tracking-tighter text-white uppercase italic">
+            <span>VAR</span>.MONKEY
           </div>
 
           <div className="mx-auto flex w-full max-w-2xl items-center gap-3">
@@ -400,52 +414,18 @@ export default function Dashboard() {
               </svg>
               <input
                 type="text"
-                placeholder="Search ClubMonkey"
+                placeholder="Search ClubMonkey Network"
                 value={searchQuery}
                 onFocus={() => setIsSearchFocused(true)}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
                   setActiveSuggestionIndex(-1);
                 }}
-                onKeyDown={(e) => {
-                  if (!searchSuggestions.length) return;
-
-                  if (e.key === "ArrowDown") {
-                    e.preventDefault();
-                    setActiveSuggestionIndex((prev) =>
-                      prev < searchSuggestions.length - 1 ? prev + 1 : 0
-                    );
-                  }
-
-                  if (e.key === "ArrowUp") {
-                    e.preventDefault();
-                    setActiveSuggestionIndex((prev) =>
-                      prev > 0 ? prev - 1 : searchSuggestions.length - 1
-                    );
-                  }
-
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    const chosenSuggestion =
-                      activeSuggestionIndex >= 0
-                        ? searchSuggestions[activeSuggestionIndex]
-                        : searchSuggestions[0];
-
-                    if (chosenSuggestion) {
-                      handleSelectSuggestion(chosenSuggestion);
-                    }
-                  }
-
-                  if (e.key === "Escape") {
-                    setIsSearchFocused(false);
-                    setActiveSuggestionIndex(-1);
-                  }
-                }}
-                className="w-full rounded-full border border-white/12 bg-white/5 py-2 pl-9 pr-4 text-sm text-zinc-200 placeholder:text-zinc-500 focus:border-white/40 focus:outline-none"
+                className="w-full rounded border border-[#2d333b] bg-[#161b22] py-2 pl-9 pr-4 text-sm text-zinc-200 placeholder:text-zinc-500 focus:border-[#5865F2] focus:outline-none transition-all"
               />
 
               {isSearchFocused && searchQuery.trim() && (
-                <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-2xl border border-white/14 bg-[#080a10]/96 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+                <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded border border-[#2d333b] bg-[#161b22] shadow-2xl backdrop-blur-xl">
                   {searchSuggestions.length > 0 ? (
                     <ul className="max-h-80 overflow-y-auto py-1">
                       {searchSuggestions.map((suggestion, index) => (
@@ -454,19 +434,17 @@ export default function Dashboard() {
                             type="button"
                             onClick={() => handleSelectSuggestion(suggestion)}
                             className={`flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors ${
-                              index === activeSuggestionIndex
-                                ? "bg-white/12"
-                                : "hover:bg-white/7"
+                              index === activeSuggestionIndex ? "bg-[#5865F2]/20 border-l-2 border-[#5865F2]" : "hover:bg-white/5"
                             }`}
                           >
-                            <span className="mt-0.5 inline-block rounded border border-white/20 bg-white/6 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-300">
+                            <span className="mt-0.5 inline-block rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-zinc-400">
                               {suggestion.type}
                             </span>
                             <span className="min-w-0">
-                              <span className="block truncate text-sm font-semibold text-zinc-100">
+                              <span className="block truncate text-sm font-bold text-zinc-100">
                                 {suggestion.label}
                               </span>
-                              <span className="block truncate text-xs text-zinc-400">
+                              <span className="block truncate text-[10px] text-zinc-500 uppercase tracking-tighter">
                                 {suggestion.sublabel}
                               </span>
                             </span>
@@ -475,8 +453,8 @@ export default function Dashboard() {
                       ))}
                     </ul>
                   ) : (
-                    <p className="px-3 py-2.5 text-xs text-zinc-400">
-                      No suggestions found.
+                    <p className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-zinc-600">
+                      NULL_RESULTS
                     </p>
                   )}
                 </div>
@@ -484,8 +462,8 @@ export default function Dashboard() {
             </div>
 
             <Link href="/collab">
-              <button className="hidden rounded-full border border-white/15 bg-white/8 px-4 py-1.5 text-xs font-semibold text-zinc-100 transition-colors hover:bg-white/14 md:block">
-                Collab on Projects
+              <button className="hidden rounded border border-[#2d333b] bg-[#161b22] px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-zinc-300 transition-all hover:bg-[#1f242c] hover:border-[#5865F2]/50 md:block">
+                Collab_Network
               </button>
             </Link>
           </div>
@@ -494,25 +472,13 @@ export default function Dashboard() {
             <button
               type="button"
               onClick={() => setShowOnboarding(true)}
-              className="grid h-9 w-9 place-items-center rounded-full border border-white/15 bg-white/7 text-sm font-semibold text-zinc-200 transition-colors hover:border-white/35"
-              aria-label="Show onboarding"
-              title="Show onboarding"
+              className="grid h-8 w-8 place-items-center rounded border border-[#2d333b] bg-[#161b22] text-[10px] font-black text-zinc-400 transition-all hover:border-[#5865F2]/50"
             >
-              i
+              INF
             </button>
             <Link href="/profile">
-              <button className="grid h-9 w-9 place-items-center rounded-full border border-white/15 bg-white/7 transition-colors hover:border-white/35">
-                <svg
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  className="h-5 w-5 text-zinc-300"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
-                    clipRule="evenodd"
-                  />
-                </svg>
+              <button className="grid h-8 w-8 place-items-center rounded border border-[#2d333b] bg-[#161b22] transition-all hover:border-[#5865F2]/50">
+                <FiUsers className="h-4 w-4 text-zinc-300" />
               </button>
             </Link>
           </div>
@@ -520,58 +486,72 @@ export default function Dashboard() {
       </header>
 
       <main
-        className={`relative z-10 mx-auto grid max-w-[1320px] grid-cols-1 gap-6 p-4 transition-[filter] duration-300 md:p-6 lg:grid-cols-12 ${
-          showOnboarding ? "blur-[3px]" : ""
+        className={`relative z-10 mx-auto grid max-w-[1440px] grid-cols-1 gap-6 p-4 transition-all duration-500 md:p-6 lg:grid-cols-12 ${
+          selectedPost ? "blur-sm grayscale-[0.5]" : ""
         }`}
       >
-        <section className="space-y-4 lg:col-span-3">
-          <h2 className="px-1 text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-400/80">
-            All Communities
-          </h2>
-          <div className="dashboard-card overflow-hidden">
-            {allClubs.map((club, index) => (
-              <Link key={club.id} href={`/clubs/${club.id}`}>
-                <div
-                  className="dashboard-item-enter flex cursor-pointer items-center gap-3 border-b border-white/8 p-3 transition-colors hover:bg-white/5 last:border-0"
-                  style={{ animationDelay: `${80 + index * 26}ms` }}
-                >
-                  <div
-                    className="h-8 w-8 rounded-full ring-1 ring-white/15 shadow-[0_0_12px_rgba(255,255,255,0.14)]"
-                    style={{ backgroundColor: club.accent_color }}
-                  />
-                  <span className="text-sm font-medium text-zinc-200">r/{club.name}</span>
-                </div>
-              </Link>
-            ))}
+        {/* LEFT COLUMN: NAVIGATION & COMMUNITIES */}
+        <section className="hidden lg:flex flex-col gap-6 lg:col-span-2">
+          <div className="space-y-6 sticky top-20">
+            <div>
+              <h2 className="px-1 mb-3 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500/80 border-l-2 border-[#5865F2] pl-3">
+                Navigation
+              </h2>
+              <nav className="flex flex-col gap-1">
+                {[
+                  { label: "Feed", active: activeFeedTab === "all", onClick: () => setActiveFeedTab("all") },
+                  { label: "For You", active: activeFeedTab === "fyp", onClick: () => setActiveFeedTab("fyp") },
+                  { label: "Popular", active: false },
+                  { label: "All Clubs", active: false },
+                ].map((item) => (
+                  <button
+                    key={item.label}
+                    onClick={item.onClick}
+                    className={`flex items-center px-3 py-2 text-[11px] font-bold uppercase transition-all rounded ${
+                      item.active ? "bg-[#5865F2]/10 text-[#5865F2] border border-[#5865F2]/20 shadow-[0_0_15px_-5px_rgba(88,101,242,0.4)]" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </nav>
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="px-1 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500/80 border-l-2 border-zinc-700 pl-3">
+                Communities
+              </h2>
+              <div className="flex flex-col border-l border-[#2d333b] ml-1">
+                {allClubs.map((club, index) => (
+                  <Link key={club.id} href={`/clubs/${club.id}`}>
+                    <div
+                      className="dashboard-item-enter flex cursor-pointer items-center gap-2 p-2 hover:bg-[#161b22] transition-all group"
+                      style={{ animationDelay: `${80 + index * 20}ms` }}
+                    >
+                      <img 
+                        src={club.logo_url || `https://api.dicebear.com/7.x/initials/svg?seed=${club.name}`} 
+                        className="h-5 w-5 rounded-sm object-cover filter grayscale group-hover:grayscale-0 transition-all border border-[#2d333b]" 
+                        alt=""
+                      />
+                      <span className="text-[11px] font-bold text-zinc-500 group-hover:text-zinc-200 transition-colors">r/{club.name}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
 
-        <section className="space-y-4 lg:col-span-5">
-          <div className="flex items-center justify-between px-1">
-            <div className="flex gap-4">
-              <button
-                onClick={() => setActiveFeedTab("all")}
-                className={`text-[11px] font-bold uppercase tracking-[0.18em] transition-colors ${
-                  activeFeedTab === "all" ? "text-white" : "text-zinc-500 hover:text-zinc-400"
-                }`}
-              >
-                Feed
-              </button>
-              <button
-                onClick={() => setActiveFeedTab("fyp")}
-                className={`text-[11px] font-bold uppercase tracking-[0.18em] transition-colors ${
-                  activeFeedTab === "fyp" ? "text-white" : "text-zinc-500 hover:text-zinc-400"
-                }`}
-              >
-                FYP
-              </button>
+        {/* CENTER COLUMN: MAIN FEED */}
+        <section className="space-y-6 lg:col-span-6">
+          <div className="flex items-center justify-between border-b border-[#2d333b] pb-2">
+            <h1 className="text-xl font-black uppercase tracking-widest text-white">
+              {activeFeedTab === "all" ? "Core Feed" : "Personalised FYP"}
+            </h1>
+            <div className="flex gap-2">
+              <div className="h-1 w-8 bg-[#5865F2] rounded-full" />
+              <div className="h-1 w-4 bg-zinc-800 rounded-full" />
             </div>
-            <div
-              className="h-[1px] flex-1 mx-4 bg-white/10"
-              style={{
-                background: `linear-gradient(90deg, transparent, rgba(255,255,255,0.1) 10%, rgba(255,255,255,0.1) 90%, transparent)`,
-              }}
-            />
           </div>
 
           <div className="space-y-4">
@@ -579,7 +559,8 @@ export default function Dashboard() {
               displayPosts.map((post, index) => (
                 <div
                   key={post.id}
-                  className="dashboard-item-enter"
+                  className="dashboard-item-enter cursor-pointer"
+                  onClick={() => setSelectedPost(post)}
                   style={{ animationDelay: `${140 + index * 45}ms` }}
                 >
                   <PostCard
@@ -590,138 +571,227 @@ export default function Dashboard() {
                 </div>
               ))
             ) : (
-              <div className="dashboard-card p-10 text-center flex flex-col items-center justify-center space-y-3">
-                <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10 text-zinc-500">
-                  {activeFeedTab === "fyp" ? "✨" : "📭"}
+              <div className="dashboard-card p-12 text-center flex flex-col items-center justify-center space-y-4">
+                <div className="w-16 h-16 rounded border border-dashed border-[#2d333b] flex items-center justify-center text-zinc-600 text-2xl font-black italic">
+                   !
                 </div>
-                <div>
-                  <p className="text-zinc-400 text-sm font-medium">
-                    {activeFeedTab === "fyp"
-                      ? "No recommendations for you yet."
-                      : "No posts to show in your feed yet."}
+                <div className="space-y-1">
+                  <p className="text-zinc-400 text-xs font-black uppercase tracking-widest">
+                    SYNC_ERROR: NO_CONTENT
                   </p>
-                  {activeFeedTab === "fyp" && (
-                    <p className="text-zinc-600 text-[10px] uppercase tracking-wider mt-1">
-                      Update your interests in the profile section
-                    </p>
-                  )}
+                  <p className="text-zinc-600 text-[10px] uppercase font-bold">
+                    System could not retrieve active signals for this feed vector
+                  </p>
                 </div>
               </div>
             )}
           </div>
         </section>
 
-        <section className="space-y-4 lg:col-span-4">
-          <h2 className="px-1 text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-400/80">
-            Recommended for You
-          </h2>
-          <div className="dashboard-card space-y-4 p-4">
-            {recommendedClubs.length > 0 ? (
-              recommendedClubs.map((club, index) => (
-                <Link
-                  key={club.id}
-                  href={`/clubs/${club.id}`}
-                  className="dashboard-item-enter group block border-b border-white/8 pb-4 last:border-0 last:pb-0"
-                  style={{ animationDelay: `${180 + index * 42}ms` }}
+        {/* RIGHT COLUMN: RECOMMENDED & PEERS */}
+        <section className="space-y-8 lg:col-span-4 lg:sticky lg:top-20 lg:h-fit">
+          <div className="space-y-4">
+            <h2 className="px-1 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500/80 border-r-2 border-blue-500 pr-3 text-right">
+              Recommended Network
+            </h2>
+            <div className="dashboard-card space-y-4 p-5 bg-[#0d1117]/80">
+              {recommendedClubs.length > 0 ? (
+                recommendedClubs.map((club, index) => (
+                  <Link
+                    key={club.id}
+                    href={`/clubs/${club.id}`}
+                    className="dashboard-item-enter group block border-b border-[#2d333b] pb-4 last:border-0 last:pb-0"
+                    style={{ animationDelay: `${180 + index * 42}ms` }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="h-10 w-10 shrink-0 rounded border border-[#2d333b] overflow-hidden filter grayscale group-hover:grayscale-0 transition-all">
+                        <img 
+                          src={club.logo_url || `https://api.dicebear.com/7.x/initials/svg?seed=${club.name}`} 
+                          alt="" 
+                          className="h-full w-full object-cover" 
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs font-black uppercase tracking-widest text-[#5865F2] group-hover:text-white transition-colors">
+                          r/{club.name}
+                        </p>
+                        <p className="line-clamp-2 text-[10px] font-bold leading-tight text-zinc-500 mt-1 uppercase tracking-tighter">
+                          {club.description}
+                        </p>
+                      </div>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <p className="text-[10px] font-bold text-zinc-600 text-center uppercase">No Network Recommendations</p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h2 className="px-1 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500/80 border-r-2 border-zinc-700 pr-3 text-right">
+              Sync Similar Peers
+            </h2>
+            <div className="flex flex-col gap-2">
+              {similarPeers.length > 0 ? (
+                similarPeers.map((user, index) => (
+                <div
+                  key={user.id}
+                  className="dashboard-card p-3 border-[#2d333b] hover:border-[#5865F2]/40 transition-all flex items-center justify-between"
+                  style={{ animationDelay: `${240 + index * 26}ms` }}
                 >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className="h-10 w-2 rounded shadow-[0_0_14px_rgba(255,255,255,0.16)]"
-                      style={{ backgroundColor: club.accent_color }}
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={user.image || `https://api.dicebear.com/7.x/pixel-art/svg?seed=${user.name}`}
+                      className="h-8 w-8 rounded-sm bg-[#161b22] border border-[#2d333b] grayscale"
+                      alt=""
                     />
-                    <div className="flex-1">
-                      <p className="text-sm font-bold text-zinc-100 transition-colors group-hover:text-zinc-200">
-                        r/{club.name}
+                    <div className="min-w-0">
+                      <p className="truncate text-[11px] font-black text-white uppercase tracking-tighter">
+                        u/{user.name}
                       </p>
-                      <p className="line-clamp-2 text-xs text-zinc-400/85">
-                        {club.description}
+                      <p className="truncate text-[9px] font-medium text-zinc-500 uppercase">
+                        {user.preferences?.slice(0, 2).join(" • ") || "No Meta"}
                       </p>
                     </div>
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {club.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded bg-white/7 px-2 py-0.5 text-[9px] text-zinc-300/90"
-                      >
-                        #{tag}
-                      </span>
-                    ))}
-                  </div>
-                </Link>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleFollowToggle(user.id, user.name); }}
+                    className={`rounded px-2 py-1 text-[9px] font-black uppercase tracking-widest transition-all ${
+                      followedUserIds.includes(user.id)
+                        ? "bg-[#2d333b] text-zinc-300"
+                        : "bg-[#5865F2]/10 text-[#5865F2] border border-[#5865F2]/20 hover:bg-[#5865F2]/20"
+                    }`}
+                  >
+                    {followedUserIds.includes(user.id) ? "Synced" : "Sync"}
+                  </button>
+                </div>
               ))
             ) : (
-              <p className="text-xs text-zinc-500">No matches found.</p>
-            )}
-          </div>
-
-          <h2 className="px-1 text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-400/80">
-            Active Members
-          </h2>
-          <div className="space-y-3">
-            {users.map((user, index) => (
-              <div
-                key={user.id}
-                className="dashboard-card dashboard-card-hover dashboard-item-enter flex items-center justify-between p-3"
-                style={{ animationDelay: `${240 + index * 26}ms` }}
-              >
-                <div className="flex items-center gap-2 flex-1">
-                  <img
-                    src={
-                      user.image ||
-                      `https://api.dicebear.com/7.x/pixel-art/svg?seed=${user.name}`
-                    }
-                    className="h-8 w-8 rounded bg-zinc-800 ring-1 ring-white/15"
-                    alt="avatar"
-                  />
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-bold text-white">
-                      u/{user.name}
-                    </p>
-                    <p className="truncate text-[11px] text-zinc-500">
-                      {user.email}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleFollowToggle(user.id, user.name)}
-                  className={`ml-2 whitespace-nowrap rounded px-2 py-1 text-[10px] font-bold transition-colors ${
-                    followedUserIds.includes(user.id)
-                      ? "bg-[#2a3b58] text-zinc-100 hover:bg-[#33486d]"
-                      : "bg-white/10 text-zinc-100 hover:bg-white/16"
-                  }`}
-                >
-                  {followedUserIds.includes(user.id) ? "Following" : "Follow"}
-                </button>
+              <div className="dashboard-card p-6 text-center border-dashed border-[#2d333b]">
+                <p className="text-[10px] text-zinc-600 font-bold uppercase italic">
+                  NO_SIMILARITY_DETECTED
+                </p>
               </div>
-            ))}
+            )}
+            </div>
           </div>
         </section>
       </main>
 
+      {/* POST DETAIL EXPANDED MODAL */}
+      <AnimatePresence>
+        {selectedPost && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={closePostDetail}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl border border-[#5865F2]/30 bg-[#0d1117] shadow-[0_0_100px_-20px_rgba(88,101,242,0.3)] z-10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="sticky top-0 z-20 flex items-center justify-between border-b border-[#2d333b] bg-[#0d1117]/80 p-4 backdrop-blur-md">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-sm bg-[#5865F2] flex items-center justify-center font-black text-white italic">
+                    {selectedPost.club_name.substring(0, 1)}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-black uppercase tracking-widest text-white">r/{selectedPost.club_name}</span>
+                    <span className="text-[10px] text-zinc-500 uppercase tracking-tighter">Signal Broadcasted at {new Date(selectedPost.created_at).toLocaleTimeString()}</span>
+                  </div>
+                </div>
+                <button 
+                  onClick={closePostDetail}
+                  className="rounded-full h-8 w-8 flex items-center justify-center bg-white/5 hover:bg-white/10 text-zinc-400 transition-all border border-white/5"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className="p-8 space-y-8">
+                <div className="space-y-4">
+                   <h2 className="text-2xl font-black text-white leading-tight">
+                    {selectedPost.content.substring(0, 60)}...
+                   </h2>
+                   <div className="h-[2px] w-24 bg-[#5865F2] ml-1" />
+                </div>
+
+                <p className="text-lg text-zinc-300 leading-relaxed font-medium whitespace-pre-wrap">
+                  {selectedPost.content}
+                </p>
+
+                {selectedPost.image_url && (
+                  <div className="rounded-lg border border-[#2d333b] overflow-hidden bg-black/50 shadow-inner">
+                    <img 
+                      src={selectedPost.image_url} 
+                      className="w-full h-auto object-contain max-h-[600px]" 
+                      alt="" 
+                    />
+                  </div>
+                )}
+
+                <div className="flex items-center gap-6 pt-10 border-t border-[#2d333b]">
+                  <button 
+                    onClick={() => handleUpvoteToggle(selectedPost.id)}
+                    className={`flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] transition-all px-4 py-2 rounded border ${
+                      Boolean(upvotes[`${selectedPost.club_id}:${selectedPost.id}`])
+                        ? "bg-[#5865F2] text-white border-[#5865F2]"
+                        : "border-[#2d333b] text-zinc-500 hover:border-[#5865F2]/50 hover:text-white"
+                    }`}
+                  >
+                    UPVOTE_SIGNAL
+                  </button>
+                  <button className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 hover:text-zinc-300 transition-all">
+                    Share_Vector
+                  </button>
+                  <button className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 hover:text-zinc-300 transition-all">
+                    Report_Noise
+                  </button>
+                </div>
+
+                <div className="pt-8 space-y-4 opacity-50">
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Comments: coming_soon.exe</p>
+                  <div className="h-20 w-full border border-dashed border-[#2d333b] rounded flex items-center justify-center">
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-700">Encrypted Communication Thread Offline</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {showOnboarding && (
         <div
-          className="fixed inset-0 z-[70] flex items-start justify-center bg-black/45 px-4 pt-16 md:pt-20"
+          className="fixed inset-0 z-[150] flex items-start justify-center bg-black/80 px-4 pt-16 md:pt-20 backdrop-blur-sm"
           onClick={closeOnboarding}
         >
           <div
-            className="w-full max-w-[540px] rounded-2xl border border-white/10 bg-[#07080b] p-3"
+            className="w-full max-w-[540px] rounded-xl border border-[#2d333b] bg-[#030303] p-4 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-2 flex items-center justify-between px-1">
-              <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-zinc-500">
-                onboarding
+            <div className="mb-4 flex items-center justify-between">
+              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#5865F2]">
+                Initial_Sync_Sequence
               </p>
               <button
                 type="button"
                 onClick={closeOnboarding}
-                className="rounded-full border border-white/10 px-3 py-1 text-xs text-zinc-300 transition-colors hover:bg-white/5"
+                className="text-xs font-bold text-zinc-600 hover:text-white transition-colors uppercase tracking-widest"
               >
-                close
+                Abort
               </button>
             </div>
 
-            <div className="flex justify-center">
+            <div className="flex justify-center border border-[#2d333b] rounded py-6 bg-[#0a0a0a]">
               <Carousel
                 items={ONBOARDING_ITEMS}
                 baseWidth={carouselWidth}
@@ -732,13 +802,13 @@ export default function Dashboard() {
               />
             </div>
 
-            <div className="mt-3 flex justify-end">
+            <div className="mt-4 flex justify-end">
               <button
                 type="button"
                 onClick={closeOnboarding}
-                className="rounded-full border border-white/12 bg-white/6 px-4 py-1.5 text-xs font-medium text-zinc-100 transition-colors hover:bg-white/10"
+                className="rounded border border-[#5865F2] bg-[#5865F2]/10 px-6 py-2 text-[10px] font-black uppercase tracking-widest text-[#5865F2] transition-all hover:bg-[#5865F2] hover:text-white"
               >
-                done
+                Initialisation_Complete
               </button>
             </div>
           </div>
@@ -747,65 +817,46 @@ export default function Dashboard() {
 
       <style jsx>{`
         .dashboard-card {
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          background: linear-gradient(180deg, rgba(14, 14, 14, 0.88), rgba(8, 8, 8, 0.95));
-          border-radius: 14px;
-          backdrop-filter: blur(6px);
-          box-shadow:
-            0 14px 40px rgba(0, 0, 0, 0.42),
-            inset 0 1px 0 rgba(255, 255, 255, 0.05);
-          animation: cardEnter 420ms ease both;
+          border: 1px solid #2d333b;
+          background: #0d1117;
+          border-radius: 8px;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+          animation: cardEnter 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
         }
 
         .dashboard-item-enter {
           opacity: 0;
-          animation: itemRise 520ms cubic-bezier(0.2, 0.75, 0.2, 1) forwards;
-        }
-
-        .aurora-layer {
-          animation: auroraBreath 8.5s ease-in-out infinite;
+          animation: itemRise 400ms cubic-bezier(0.2, 0.75, 0.2, 1) forwards;
         }
 
         .dashboard-card-hover {
-          transition: border-color 220ms ease, transform 220ms ease, background-color 220ms ease;
+          transition: all 200ms ease;
         }
 
         .dashboard-card-hover:hover {
-          border-color: rgba(255, 255, 255, 0.3);
-          transform: translateY(-1px);
+          border-color: #5865F266;
+          background: #161b22;
         }
 
         @keyframes cardEnter {
           0% {
             opacity: 0;
-            transform: translateY(6px);
+            transform: scale(0.98) translateY(4px);
           }
           100% {
             opacity: 1;
-            transform: translateY(0);
+            transform: scale(1) translateY(0);
           }
         }
 
         @keyframes itemRise {
           0% {
             opacity: 0;
-            transform: translateY(10px);
+            transform: translateY(8px);
           }
           100% {
             opacity: 1;
             transform: translateY(0);
-          }
-        }
-
-        @keyframes auroraBreath {
-          0%,
-          100% {
-            opacity: 0.62;
-            transform: scale(1);
-          }
-          50% {
-            opacity: 0.8;
-            transform: scale(1.02);
           }
         }
       `}</style>

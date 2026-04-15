@@ -361,12 +361,22 @@ def get_club_details(club_id: int, db: Session = Depends(get_db)):
     follower_count = db.query(ClubFollower).filter(ClubFollower.club_id == club_id).count()
     club_posts = db.query(Post).filter(Post.club_id == club_id).order_by(Post.created_at.desc()).all()
     
+    # Find the admin user
+    admin_user = db.query(User).filter(User.admin_of_club_id == club_id).first()
+    admin_info = None
+    if admin_user:
+        admin_info = {
+            "name": admin_user.name,
+            "email": admin_user.email,
+            "image": admin_user.image
+        }
+
     return {
         "club": club,
         "posts": club_posts,
-        "follower_count": follower_count
+        "follower_count": follower_count,
+        "admin": admin_info
     }
-
 class FollowRequest(BaseModel):
     user_id: str
     club_id: int
@@ -495,7 +505,7 @@ class ProfileResponse(BaseModel):
     posted_projects: List[ProjectSchema]
     collaborating_projects: List[ProjectSchema]
     following_count: int
-    following_names: List[str]
+    following_clubs: List[ClubSchema]
 
     class Config:
         from_attributes = True
@@ -533,8 +543,7 @@ def get_user_profile(user_id: str, db: Session = Depends(get_db)):
         if user_prefs.intersection(club_tags):
             recommended.append(club)
 
-    followed_clubs = db.query(Club.name).join(ClubFollower).filter(ClubFollower.user_id == user_id).all()
-    following_list = [f[0] for f in followed_clubs]
+    followed_clubs = db.query(Club).join(ClubFollower).filter(ClubFollower.user_id == user_id).all()
 
     return {
         "user": user,
@@ -542,7 +551,7 @@ def get_user_profile(user_id: str, db: Session = Depends(get_db)):
         "recommended_clubs": recommended,
         "posted_projects": my_projects,
         "collaborating_projects": collab_projects,
-        "following_count": len(following_list),
-        "following_names": following_list
+        "following_count": len(followed_clubs),
+        "following_clubs": followed_clubs
     }
     
