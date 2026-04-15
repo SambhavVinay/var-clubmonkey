@@ -19,7 +19,7 @@ export const users = pgTable("users", {
   password: text("password"), // <--- Add this line
   image: text("image"),
   preferences: jsonb("preferences").$type<string[]>().default([]),
-  isAdmin: boolean("is_admin").default(false),
+  adminOfClubId: integer("admin_of_club_id").references(() => clubs.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -127,6 +127,10 @@ export const clubsRelations = relations(clubs, ({ many }) => ({
 export const projectsRelations = relations(projects, ({ one, many }) => ({
   author: one(users, { fields: [projects.authorId], references: [users.id] }),
   collaborators: many(projectCollaborators),
+}));
+
+export const postsRelations = relations(posts, ({ one }) => ({
+  club: one(clubs, { fields: [posts.clubId], references: [clubs.id] }),
 }));
 
 export const clubMembersRelations = relations(clubMembers, ({ one }) => ({

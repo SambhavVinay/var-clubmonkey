@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import TiltedCard from "@/components/TiltedCard";
+import Navigation from "@/components/Navigation";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
@@ -37,7 +38,8 @@ export default function RecommendedClubs() {
   if (error) return <div className="p-10 text-red-300">{error}</div>;
 
   return (
-    <main className="min-h-screen bg-[#04060d] p-8 text-white md:p-10">
+    <main className="min-h-screen bg-[#04060d] p-8 pt-20 text-white md:p-10">
+      <Navigation title="Clubs For You" />
       <h1 className="mb-8 text-4xl font-bold tracking-tight">Clubs For You</h1>
 
       <div className="grid grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-3">

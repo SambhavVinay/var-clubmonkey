@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import TinyToast from "@/components/TinyToast";
+import Navigation from "@/components/Navigation";
 
 interface User {
   id: string;
@@ -201,7 +202,8 @@ export default function ProfilePage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#030303] text-[#D7DADC] p-4 md:p-8">
+    <main className="min-h-screen bg-[#030303] text-[#D7DADC] p-4 md:p-8 pt-20">
+      <Navigation title="User Profile" />
       <div className="max-w-6xl mx-auto space-y-10">
         <section className="bg-[#1A1A1B] border border-[#343536] rounded-xl p-6 flex items-start gap-6">
           <img

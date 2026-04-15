@@ -6,6 +6,7 @@ import Link from "next/link";
 import Aurora from "@/components/Aurora";
 import Carousel, { type CarouselItem } from "@/components/Carousel";
 import TinyToast from "@/components/TinyToast";
+import PostCard from "@/components/PostCard";
 import { FiAperture, FiHeart, FiPlusSquare, FiSmile, FiUsers } from "react-icons/fi";
 
 interface Club {
@@ -29,6 +30,17 @@ interface SearchSuggestion {
   sublabel: string;
   type: "feed" | "club" | "user";
   href?: string;
+}
+
+interface FeedPost {
+  id: number;
+  club_id: number;
+  content: string;
+  image_url?: string;
+  created_at: string;
+  club_name: string;
+  club_logo_url?: string;
+  club_accent_color: string;
 }
 
 const FEED_ITEMS = [
@@ -121,6 +133,9 @@ export default function Dashboard() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [carouselWidth, setCarouselWidth] = useState(320);
   const [loading, setLoading] = useState(true);
+  const [posts, setPosts] = useState<FeedPost[]>([]);
+  const [activeFeedTab, setActiveFeedTab] = useState<"all" | "fyp">("all");
+  const [upvotes, setUpvotes] = useState<Record<string, number>>({});
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -176,6 +191,18 @@ export default function Dashboard() {
     return [...clubMatches, ...feedMatches, ...userMatches].slice(0, 8);
   }, [allClubs, searchQuery, users]);
 
+  const fypPosts = useMemo(() => {
+    const userSession = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("user") || "{}") : {};
+    const recommendedIds = recommendedClubs.map((c) => c.id);
+    const adminClubId = userSession.admin_of_club_id;
+
+    return posts.filter(
+      (post) => recommendedIds.includes(post.club_id) || post.club_id === adminClubId
+    );
+  }, [posts, recommendedClubs]);
+
+  const displayPosts = activeFeedTab === "all" ? posts : fypPosts;
+
   const handleSelectSuggestion = (suggestion: SearchSuggestion) => {
     setSearchQuery(suggestion.label);
     setIsSearchFocused(false);
@@ -198,6 +225,11 @@ export default function Dashboard() {
       setFollowedUserIds(JSON.parse(savedFollowState));
     }
 
+    const savedUpvoteState = localStorage.getItem(`clubmonkey:postUpvotes:${userSession.id}`);
+    if (savedUpvoteState) {
+      setUpvotes(JSON.parse(savedUpvoteState));
+    }
+
     const onboardingSeen =
       localStorage.getItem(`clubmonkey:onboardingSeen:${userSession.id}`) === "true";
     if (!onboardingSeen) {
@@ -206,19 +238,22 @@ export default function Dashboard() {
 
     const fetchData = async () => {
       try {
-        const [uRes, cRes, rRes] = await Promise.all([
+        const [uRes, cRes, rRes, pRes] = await Promise.all([
           fetch(`${API_BASE_URL}/users`),
           fetch(`${API_BASE_URL}/clubs`),
           fetch(`${API_BASE_URL}/clubs/recommended/${userSession.id}`),
+          fetch(`${API_BASE_URL}/posts`),
         ]);
 
         const uData = await uRes.json();
         const cData = await cRes.json();
         const rData = await rRes.json();
+        const pData = await pRes.json();
 
         setUsers(uData);
         setAllClubs(cData);
         setRecommendedClubs(rData);
+        setPosts(pData);
       } catch (error) {
         console.error("Dashboard fetch error:", error);
       } finally {
@@ -297,6 +332,27 @@ export default function Dashboard() {
       setToastTone(wasFollowing ? "info" : "success");
       setToastMessage(wasFollowing ? `Unfollowed u/${userName}` : `Following u/${userName}`);
 
+      return next;
+    });
+  };
+
+  const handleUpvoteToggle = (postId: number) => {
+    if (!currentUserId) return;
+
+    // Find the post to get the club_id
+    const post = posts.find((p) => p.id === postId);
+    if (!post) return;
+
+    const key = `${post.club_id}:${postId}`;
+    setUpvotes((prev) => {
+      const wasUpvoted = Boolean(prev[key]);
+      const next = { ...prev, [key]: wasUpvoted ? 0 : 1 };
+      localStorage.setItem(
+        `clubmonkey:postUpvotes:${currentUserId}`,
+        JSON.stringify(next)
+      );
+      setToastTone(wasUpvoted ? "info" : "success");
+      setToastMessage(wasUpvoted ? "Upvote removed" : "Post upvoted");
       return next;
     });
   };
@@ -491,27 +547,67 @@ export default function Dashboard() {
         </section>
 
         <section className="space-y-4 lg:col-span-5">
-          <h2 className="px-1 text-[11px] font-bold uppercase tracking-[0.18em] text-zinc-400/80">
-            Your Feed
-          </h2>
-          <div className="space-y-4">
-            {FEED_ITEMS.map((item, index) => (
-              <div
-                key={item.id}
-                className="dashboard-card dashboard-card-hover dashboard-item-enter cursor-pointer p-4"
-                style={{ animationDelay: `${140 + index * 45}ms` }}
+          <div className="flex items-center justify-between px-1">
+            <div className="flex gap-4">
+              <button
+                onClick={() => setActiveFeedTab("all")}
+                className={`text-[11px] font-bold uppercase tracking-[0.18em] transition-colors ${
+                  activeFeedTab === "all" ? "text-white" : "text-zinc-500 hover:text-zinc-400"
+                }`}
               >
-                <div className="flex items-start justify-between mb-2">
-                  <span className="rounded border border-white/18 bg-white/10 px-2 py-1 text-[11px] font-bold text-white">
-                    {item.category}
-                  </span>
+                Feed
+              </button>
+              <button
+                onClick={() => setActiveFeedTab("fyp")}
+                className={`text-[11px] font-bold uppercase tracking-[0.18em] transition-colors ${
+                  activeFeedTab === "fyp" ? "text-white" : "text-zinc-500 hover:text-zinc-400"
+                }`}
+              >
+                FYP
+              </button>
+            </div>
+            <div
+              className="h-[1px] flex-1 mx-4 bg-white/10"
+              style={{
+                background: `linear-gradient(90deg, transparent, rgba(255,255,255,0.1) 10%, rgba(255,255,255,0.1) 90%, transparent)`,
+              }}
+            />
+          </div>
+
+          <div className="space-y-4">
+            {displayPosts.length > 0 ? (
+              displayPosts.map((post, index) => (
+                <div
+                  key={post.id}
+                  className="dashboard-item-enter"
+                  style={{ animationDelay: `${140 + index * 45}ms` }}
+                >
+                  <PostCard
+                    post={post}
+                    isUpvoted={Boolean(upvotes[`${post.club_id}:${post.id}`])}
+                    onUpvote={handleUpvoteToggle}
+                  />
                 </div>
-                <h3 className="mb-2 line-clamp-2 text-sm font-bold text-white transition-colors hover:text-zinc-200">
-                  {item.title}
-                </h3>
-                <p className="text-xs text-zinc-400/85">by {item.author}</p>
+              ))
+            ) : (
+              <div className="dashboard-card p-10 text-center flex flex-col items-center justify-center space-y-3">
+                <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10 text-zinc-500">
+                  {activeFeedTab === "fyp" ? "✨" : "📭"}
+                </div>
+                <div>
+                  <p className="text-zinc-400 text-sm font-medium">
+                    {activeFeedTab === "fyp"
+                      ? "No recommendations for you yet."
+                      : "No posts to show in your feed yet."}
+                  </p>
+                  {activeFeedTab === "fyp" && (
+                    <p className="text-zinc-600 text-[10px] uppercase tracking-wider mt-1">
+                      Update your interests in the profile section
+                    </p>
+                  )}
+                </div>
               </div>
-            ))}
+            )}
           </div>
         </section>
 

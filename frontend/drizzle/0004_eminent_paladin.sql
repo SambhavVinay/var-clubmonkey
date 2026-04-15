@@ -1,1 +1,0 @@
-ALTER TABLE "projects" ALTER COLUMN "contact_info" SET DEFAULT '';

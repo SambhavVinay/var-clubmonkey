@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Aurora from "@/components/Aurora";
+import Navigation from "@/components/Navigation";
 
 interface Project {
   id: number;
@@ -38,7 +39,8 @@ export default function CollabHub() {
     );
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-black text-[#D7DADC] p-8">
+    <main className="relative min-h-screen overflow-hidden bg-black text-[#D7DADC] p-8 pt-20">
+      <Navigation title="Collaboration Hub" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_14%_10%,rgba(48,86,178,0.16),transparent_42%),radial-gradient(circle_at_90%_12%,rgba(86,64,146,0.11),transparent_38%),linear-gradient(180deg,#020207_0%,#070910_100%)]" />
       <div className="pointer-events-none absolute inset-0 opacity-66 mix-blend-screen">
         <Aurora

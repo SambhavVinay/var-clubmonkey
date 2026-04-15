@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import TinyToast from "@/components/TinyToast";
+import PostCard from "@/components/PostCard";
+import Navigation from "@/components/Navigation";
 
 interface Club {
   id: number;
@@ -73,6 +75,12 @@ function mixHex(colorA: string, colorB: string, amount: number): string {
 }
 
 export default function ClubProfile() {
+  // Inside ClubProfile component
+  const [postContent, setPostContent] = useState("");
+  const [postImage, setPostImage] = useState<File | null>(null);
+  const [isPosting, setIsPosting] = useState(false);
+  const [showPostModal, setShowPostModal] = useState(false); // Toggle visibility
+  const [isAdminOfThisClub, setIsAdminOfThisClub] = useState(false);
   const { id } = useParams();
   const [data, setData] = useState<ClubPageData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -85,6 +93,39 @@ export default function ClubProfile() {
   const [isFollowing, setIsFollowing] = useState(false);
   const [hoveringFollow, setHoveringFollow] = useState(false);
 
+  const handleCreatePost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!postContent) return;
+    setIsPosting(true);
+
+    const formData = new FormData();
+    formData.append("content", postContent);
+    if (postImage) formData.append("image", postImage);
+
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/clubs/${id}/posts`, {
+        method: "POST",
+        body: formData, // Browser sets Content-Type to multipart/form-data automatically
+      });
+
+      if (res.ok) {
+        const newPost = await res.json();
+        // Update local state to show the new post immediately
+        setData((prev) =>
+          prev ? { ...prev, posts: [newPost, ...prev.posts] } : null,
+        );
+        setPostContent("");
+        setPostImage(null);
+        setShowPostModal(false);
+        setToastMessage("Post created successfully!");
+      }
+    } catch (error) {
+      console.error("Upload failed", error);
+    } finally {
+      setIsPosting(false);
+    }
+  };
+
   useEffect(() => {
     const rawSession = localStorage.getItem("user");
     if (!rawSession) return;
@@ -92,6 +133,10 @@ export default function ClubProfile() {
     if (!userSession?.id) return;
 
     setCurrentUserId(userSession.id);
+
+    if (userSession.admin_of_club_id === Number(id)) {
+      setIsAdminOfThisClub(true);
+    }
 
     const joinedRaw = localStorage.getItem(
       `clubmonkey:joinedClubs:${userSession.id}`,
@@ -153,14 +198,19 @@ export default function ClubProfile() {
     setFollowerCount((prev) => (result.following ? prev + 1 : prev - 1));
     setToastMessage(result.following ? "Following!" : "Unfollowed");
 
-    const followsRaw = localStorage.getItem(`clubmonkey:follows:${currentUserId}`);
+    const followsRaw = localStorage.getItem(
+      `clubmonkey:follows:${currentUserId}`,
+    );
     let followsList = followsRaw ? (JSON.parse(followsRaw) as number[]) : [];
     if (result.following) {
       if (!followsList.includes(Number(id))) followsList.push(Number(id));
     } else {
       followsList = followsList.filter((fid) => fid !== Number(id));
     }
-    localStorage.setItem(`clubmonkey:follows:${currentUserId}`, JSON.stringify(followsList));
+    localStorage.setItem(
+      `clubmonkey:follows:${currentUserId}`,
+      JSON.stringify(followsList),
+    );
   };
 
   if (loading)
@@ -193,6 +243,26 @@ export default function ClubProfile() {
 
   const buttonStyle = {
     backgroundColor: club.accent_color,
+  };
+
+  const handleDeletePost = async (postId: number) => {
+    if (!confirm("Are you sure you want to delete this post?")) return;
+
+    const res = await fetch(`http://127.0.0.1:8000/posts/${postId}`, {
+      method: "DELETE",
+    });
+
+    if (res.ok) {
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              posts: prev.posts.filter((p) => p.id !== postId),
+            }
+          : null,
+      );
+      setToastMessage("Post deleted");
+    }
   };
 
   const handleJoinToggle = () => {
@@ -248,8 +318,9 @@ export default function ClubProfile() {
   return (
     <main
       style={pageStyle}
-      className="relative text-[#D7DADC] min-h-screen overflow-hidden"
+      className="relative text-[#D7DADC] min-h-screen overflow-hidden pt-12"
     >
+      <Navigation title={`r/${club.name}`} />
       <div
         className="relative z-20 h-48 w-full"
         style={{ backgroundColor: club.accent_color, opacity: 0.86 }}
@@ -295,37 +366,19 @@ export default function ClubProfile() {
 
           {posts.length > 0 ? (
             posts.map((post: Post) => (
-              <div
+              <PostCard
                 key={post.id}
-                className="bg-[#1A1A1B] border border-[#343536] rounded-md p-4 hover:border-zinc-500 transition-all"
-              >
-                <p className="text-sm text-zinc-400 mb-2">
-                  u/admin • {new Date(post.created_at).toLocaleDateString()}
-                </p>
-                <div className="text-lg font-medium mb-3">{post.content}</div>
-                {post.image_url && (
-                  <img
-                    src={post.image_url}
-                    className="rounded-lg w-full object-cover max-h-96"
-                    alt="post"
-                  />
-                )}
-                <div className="mt-4 flex gap-4 text-xs font-bold text-zinc-500">
-                  <span
-                    onClick={() => handleUpvoteToggle(post.id)}
-                    className={`p-1 rounded cursor-pointer transition-colors ${
-                      upvotes[`${club.id}:${post.id}`]
-                        ? "bg-red-900/20 text-red-400"
-                        : "hover:bg-zinc-800"
-                    }`}
-                  >
-                    ▲ UPVOTE {upvotes[`${club.id}:${post.id}`] || 0}
-                  </span>
-                  <span className="hover:bg-zinc-800 p-1 rounded cursor-pointer">
-                    ● COMMENTS
-                  </span>
-                </div>
-              </div>
+                post={{
+                  ...post,
+                  club_id: club.id,
+                  club_name: club.name,
+                  club_logo_url: club.logo_url,
+                  club_accent_color: club.accent_color || "#3b4f8f",
+                }}
+                isUpvoted={Boolean(upvotes[`${club.id}:${post.id}`])}
+                onUpvote={handleUpvoteToggle}
+                showClubInfo={false} // Already on the club page
+              />
             ))
           ) : (
             <div className="text-zinc-500 py-10 text-center bg-[#1A1A1B] rounded">
@@ -342,6 +395,32 @@ export default function ClubProfile() {
             >
               About Community
             </div>
+            {isAdminOfThisClub && (
+              <div className="p-4 border-t border-[#343536] bg-[#1A1A1B] rounded-md mb-4">
+                <h3 className="text-sm font-bold mb-3">Admin: Create a Post</h3>
+                <form onSubmit={handleCreatePost} className="space-y-3">
+                  <textarea
+                    className="w-full bg-[#272729] border border-[#343536] rounded p-2 text-sm focus:outline-none focus:border-zinc-500"
+                    placeholder="What's happening in the club?"
+                    value={postContent}
+                    onChange={(e) => setPostContent(e.target.value)}
+                  />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setPostImage(e.target.files?.[0] || null)}
+                    className="text-xs text-zinc-400 file:mr-4 file:py-1 file:px-4 file:rounded-full file:border-0 file:text-xs file:bg-zinc-700 file:text-zinc-300 hover:file:bg-zinc-600"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isPosting}
+                    className="w-full py-2 rounded-full font-bold text-black bg-white hover:bg-zinc-200 transition-colors disabled:opacity-50"
+                  >
+                    {isPosting ? "Posting..." : "Post to Community"}
+                  </button>
+                </form>
+              </div>
+            )}
             <div className="p-4 space-y-4">
               <p className="text-sm">{club.description}</p>
 
@@ -373,7 +452,11 @@ export default function ClubProfile() {
                       : "border-white/20 hover:bg-white/10 text-white cursor-pointer"
                   }`}
                 >
-                  {isFollowing ? (hoveringFollow ? "Unfollow" : "Following") : "Follow"}
+                  {isFollowing
+                    ? hoveringFollow
+                      ? "Unfollow"
+                      : "Following"
+                    : "Follow"}
                 </button>
               </div>
               <button

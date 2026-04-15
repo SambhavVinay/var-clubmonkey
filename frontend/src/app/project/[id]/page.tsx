@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import Navigation from "@/components/Navigation";
 export default function ProjectDetail() {
   const { id } = useParams();
   const router = useRouter();
@@ -55,14 +56,9 @@ export default function ProjectDetail() {
   const { project, author_name } = data;
 
   return (
-    <main className="min-h-screen bg-[#030303] text-[#D7DADC] p-8">
+    <main className="min-h-screen bg-[#030303] text-[#D7DADC] p-8 pt-20">
+      <Navigation title={`Project: ${project?.title || ""}`} />
       <div className="max-w-4xl mx-auto">
-        <button
-          onClick={() => router.back()}
-          className="text-zinc-500 hover:text-white mb-6 flex items-center gap-2"
-        >
-          ← Back to Hub
-        </button>
 
         <div className="bg-[#1A1A1B] border border-[#343536] rounded-xl p-8">
           <div className="flex justify-between items-start mb-6">
