@@ -13,18 +13,21 @@ from firebase_admin import auth as firebase_auth, credentials
 import cloudinary
 import cloudinary.uploader
 from fastapi import UploadFile, File, Form
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # 1. Cloudinary Configuration
 cloudinary.config( 
-  cloud_name = "dpatlkyai", 
-  api_key = "935877554957899", 
-  api_secret = "JSiZZaO01kKZEw8qbW4wpNUE8vY",
+  cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME"), 
+  api_key = os.getenv("CLOUDINARY_API_KEY"), 
+  api_secret = os.getenv("CLOUDINARY_API_SECRET"),
   secure = True
 )
  
  
-GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "293357637102-ddj6m9adt97cquei9ameuqirjks3tfju.apps.googleusercontent.com")
-DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql+psycopg2://neondb_owner:npg_YrsM3yKIRxH0@ep-orange-cell-ah07255h-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require")
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(
     DATABASE_URL,
     
