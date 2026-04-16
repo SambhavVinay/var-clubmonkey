@@ -11,6 +11,18 @@ from typing import List, Optional
 import os
 import firebase_admin
 from firebase_admin import auth as firebase_auth, credentials
+import cloudinary
+import cloudinary.uploader
+from fastapi import UploadFile, File, Form
+
+# 1. Cloudinary Configuration
+cloudinary.config( 
+  cloud_name = "dpatlkyai", 
+  api_key = "935877554957899", 
+  api_secret = "JSiZZaO01kKZEw8qbW4wpNUE8vY",
+  secure = True
+)
+ 
  
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "293357637102-ddj6m9adt97cquei9ameuqirjks3tfju.apps.googleusercontent.com")
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql+psycopg2://neondb_owner:npg_YrsM3yKIRxH0@ep-orange-cell-ah07255h-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require")
@@ -32,7 +44,7 @@ class User(Base):
     email = Column(String, nullable=False, unique=True)
     image = Column(String)
     preferences = Column(JSON, server_default='[]')
-    is_admin = Column(Boolean, default=False)
+    admin_of_club_id = Column(Integer, ForeignKey("clubs.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class Club(Base):
@@ -108,13 +120,22 @@ def get_db():
 class GoogleAuthRequest(BaseModel):
     token: str
 
+class PostResponse(BaseModel):
+    id: int
+    club_id: int
+    content: str
+    image_url: Optional[str]
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
 class UserSchema(BaseModel):
     id: str
     name: str
     email: str
     image: Optional[str] = None
     preferences: List[str] = []
-    is_admin: bool = False  # <--- CRITICAL: Add this so the frontend can see it
+    admin_of_club_id: Optional[int] = None 
     created_at: datetime 
     class Config:
         from_attributes = True
@@ -146,6 +167,18 @@ class PostSchema(BaseModel):
     class Config:
         from_attributes = True
 
+class FeedPostResponse(BaseModel):
+    id: int
+    club_id: int
+    content: str
+    image_url: Optional[str]
+    created_at: datetime
+    club_name: str
+    club_logo_url: Optional[str]
+    club_accent_color: str
+    class Config:
+        from_attributes = True
+
 class PreferencesUpdate(BaseModel):
     user_id: str
     interests: List[str]
@@ -160,8 +193,72 @@ if not firebase_admin._apps:
     cred = credentials.Certificate("service-account.json") 
     firebase_admin.initialize_app(cred)
 
-# Define the allowed admin emails at the top of your file
-ALLOWED_ADMIN_EMAILS = {"teamdopameme@gmail.com", "sambhavvinay20054@gmail.com"}
+# 1. Update the mapping (Email -> Club ID)
+ADMIN_MAPPING = {
+    "teamdopameme@gmail.com": 1,        # Manages Club with ID 1
+    "sambhavvinay20054@gmail.com": 2    # Manages Club with ID 2
+}
+
+
+# 3. The Upload Endpoint
+@app.post("/clubs/{club_id}/posts", response_model=PostResponse)
+async def create_post(
+    club_id: int,
+    content: str = Form(...),
+    image: UploadFile = File(None),
+    db: Session = Depends(get_db)
+):
+    url = None
+    if image:
+        # Upload to Cloudinary
+        upload_result = cloudinary.uploader.upload(image.file)
+        url = upload_result.get("secure_url")
+
+    new_post = Post(
+        club_id=club_id,
+        content=content,
+        image_url=url
+    )
+    
+    db.add(new_post)
+    db.commit()
+    db.refresh(new_post)
+    return new_post
+
+@app.get("/posts", response_model=List[FeedPostResponse])
+def get_all_posts(db: Session = Depends(get_db)):
+    """Fetch all posts from all clubs with club metadata."""
+    results = db.query(
+        Post.id,
+        Post.club_id,
+        Post.content,
+        Post.image_url,
+        Post.created_at,
+        Club.name.label("club_name"),
+        Club.logo_url.label("club_logo_url"),
+        Club.accent_color.label("club_accent_color")
+    ).join(Club, Post.club_id == Club.id).order_by(Post.created_at.desc()).all()
+    
+    return results
+
+@app.delete("/posts/{post_id}")
+def delete_post(post_id: int, db: Session = Depends(get_db)):
+    post = db.query(Post).filter(Post.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    # Optional: Delete image from Cloudinary if it exists
+    if post.image_url:
+        try:
+            # Extract public_id from URL: http://.../v12345/public_id.jpg
+            public_id = post.image_url.split('/')[-1].split('.')[0]
+            cloudinary.uploader.destroy(public_id)
+        except Exception as e:
+            print(f"Failed to delete image from Cloudinary: {e}")
+
+    db.delete(post)
+    db.commit()
+    return {"message": "Post deleted successfully"}
 
 @app.post("/auth/google", response_model=UserSchema)
 def google_auth(data: GoogleAuthRequest, db: Session = Depends(get_db)):
@@ -183,7 +280,7 @@ def google_auth(data: GoogleAuthRequest, db: Session = Depends(get_db)):
         picture = decoded_token.get('picture')
 
         # Check whitelist
-        is_admin_user = email in ALLOWED_ADMIN_EMAILS
+        assigned_club_id = ADMIN_MAPPING.get(email)
 
         # Query existing user
         user = db.query(User).filter(User.email == email).first()
@@ -196,13 +293,13 @@ def google_auth(data: GoogleAuthRequest, db: Session = Depends(get_db)):
                 email=email,
                 image=picture,
                 preferences=[],
-                is_admin=is_admin_user # Assign admin status on creation
+                admin_of_club_id=assigned_club_id 
             )
             db.add(user)
         else:
             # IMPORTANT: Update admin status for existing users 
             # in case they were added to the whitelist later
-            user.is_admin = is_admin_user
+            user.admin_of_club_id = assigned_club_id
         
         db.commit()
         db.refresh(user)
@@ -286,12 +383,22 @@ def get_club_details(club_id: int, db: Session = Depends(get_db)):
     follower_count = db.query(ClubFollower).filter(ClubFollower.club_id == club_id).count()
     club_posts = db.query(Post).filter(Post.club_id == club_id).order_by(Post.created_at.desc()).all()
     
+    # Find the admin user
+    admin_user = db.query(User).filter(User.admin_of_club_id == club_id).first()
+    admin_info = None
+    if admin_user:
+        admin_info = {
+            "name": admin_user.name,
+            "email": admin_user.email,
+            "image": admin_user.image
+        }
+
     return {
         "club": club,
         "posts": club_posts,
-        "follower_count": follower_count
+        "follower_count": follower_count,
+        "admin": admin_info
     }
-
 class FollowRequest(BaseModel):
     user_id: str
     club_id: int
@@ -420,7 +527,7 @@ class ProfileResponse(BaseModel):
     posted_projects: List[ProjectSchema]
     collaborating_projects: List[ProjectSchema]
     following_count: int
-    following_names: List[str]
+    following_clubs: List[ClubSchema]
 
     class Config:
         from_attributes = True
@@ -458,8 +565,7 @@ def get_user_profile(user_id: str, db: Session = Depends(get_db)):
         if user_prefs.intersection(club_tags):
             recommended.append(club)
 
-    followed_clubs = db.query(Club.name).join(ClubFollower).filter(ClubFollower.user_id == user_id).all()
-    following_list = [f[0] for f in followed_clubs]
+    followed_clubs = db.query(Club).join(ClubFollower).filter(ClubFollower.user_id == user_id).all()
 
     return {
         "user": user,
@@ -467,7 +573,7 @@ def get_user_profile(user_id: str, db: Session = Depends(get_db)):
         "recommended_clubs": recommended,
         "posted_projects": my_projects,
         "collaborating_projects": collab_projects,
-        "following_count": len(following_list),
-        "following_names": following_list
+        "following_count": len(followed_clubs),
+        "following_clubs": followed_clubs
     }
     

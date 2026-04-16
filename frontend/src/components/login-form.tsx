@@ -22,7 +22,7 @@ interface AuthResponse {
   id: string;
   name: string;
   email: string;
-  is_admin: boolean;
+  admin_of_club_id: number | null;
   preferences?: string[];
   detail?: string;
   [key: string]: unknown;
@@ -70,9 +70,9 @@ export default function AuthPage({
   useEffect(() => {
     if (!showTransitionOverlay) return;
 
-      const timeoutId = window.setTimeout(() => {
-        setShowTransitionOverlay(false);
-      }, 420);
+    const timeoutId = window.setTimeout(() => {
+      setShowTransitionOverlay(false);
+    }, 420);
 
     return () => {
       window.clearTimeout(timeoutId);
@@ -100,7 +100,9 @@ export default function AuthPage({
         throw new Error(data.detail || "Authentication failed");
       }
 
-      if (loginType === "admin" && !data.is_admin) {
+      const isAnAdmin = data.admin_of_club_id !== null;
+
+      if (loginType === "admin" && !isAnAdmin) {
         setError(
           "No, you aren't registered as a club admin, please use the admin email",
         );
@@ -110,7 +112,7 @@ export default function AuthPage({
 
       localStorage.setItem("user", JSON.stringify(data));
 
-      if (data.is_admin && loginType === "admin") {
+      if (isAnAdmin && loginType === "admin") {
         router.push("/main");
       } else if (!data.preferences || data.preferences.length === 0) {
         router.push("/onboarding");
@@ -119,7 +121,9 @@ export default function AuthPage({
       }
     } catch (err: unknown) {
       console.error("Auth Error:", err);
-      setError(err instanceof Error ? err.message : "An unexpected error occurred");
+      setError(
+        err instanceof Error ? err.message : "An unexpected error occurred",
+      );
     } finally {
       setLoading(null);
     }
@@ -135,7 +139,7 @@ export default function AuthPage({
 
       <div className="pointer-events-none absolute inset-0 z-0">
         <div className="absolute inset-0 bg-gradient-to-b from-[#020410] via-[#010208] to-[#010208]" />
-        
+
         {/* Enhanced Aurora (Re-added and popped with colors) */}
         <div className="absolute inset-0 opacity-70 mix-blend-screen overflow-hidden">
           <Aurora
@@ -258,7 +262,10 @@ export default function AuthPage({
 
             <p className="px-8 text-center text-[10px] uppercase tracking-wide text-zinc-600">
               By continuing, you agree to our{" "}
-              <a href="#" className="underline underline-offset-4 hover:text-zinc-400">
+              <a
+                href="#"
+                className="underline underline-offset-4 hover:text-zinc-400"
+              >
                 Terms
               </a>
               .
@@ -277,7 +284,12 @@ export default function AuthPage({
         }
 
         .auth-vignette {
-          background: radial-gradient(circle at center, rgba(1, 2, 8, 0) 42%, rgba(1, 2, 8, 0.28) 80%, rgba(1, 2, 8, 0.54) 100%);
+          background: radial-gradient(
+            circle at center,
+            rgba(1, 2, 8, 0) 42%,
+            rgba(1, 2, 8, 0.28) 80%,
+            rgba(1, 2, 8, 0.54) 100%
+          );
         }
 
         @keyframes authCardIn {

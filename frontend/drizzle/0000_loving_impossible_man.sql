@@ -1,6 +1,0 @@
-CREATE TABLE "notes" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"title" text NOT NULL,
-	"content" text NOT NULL,
-	"CreatedAt" timestamp DEFAULT now()
-);
