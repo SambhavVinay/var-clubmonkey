@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Navigation from "@/components/Navigation";
 
 export default function NewProject() {
   const router = useRouter();
@@ -64,39 +65,36 @@ export default function NewProject() {
   };
 
   return (
-    <main className="min-h-screen bg-[#030303] text-[#D7DADC] p-8 flex justify-center">
-      <div className="w-full max-w-2xl">
-        <button
-          onClick={() => router.back()}
-          className="text-zinc-500 hover:text-white mb-6 transition-colors"
-        >
-          ← Cancel
-        </button>
+    <main className="relative min-h-screen bg-[#030303] text-[#D7DADC] p-8 pt-20 flex justify-center">
+      <Navigation title="Post Project Payload" />
+      <div className="pointer-events-none fixed inset-0 z-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
 
-        <div className="bg-[#1A1A1B] border border-[#343536] rounded-xl p-8 shadow-2xl">
-          <h1 className="text-3xl font-bold text-white mb-2">
-            Create a Project
-          </h1>
-          <p className="text-zinc-500 mb-8 text-sm">
-            List your project details and find the best collaborators in the
-            university.
-          </p>
+      <div className="relative z-10 w-full max-w-2xl mt-4">
+        <div className="bg-[#0d1117]/80 border border-[#2d333b] rounded p-8 shadow-2xl backdrop-blur-xl dashboard-card">
+          <div className="mb-8 border-b border-[#2d333b] pb-4">
+            <h1 className="text-xl font-black uppercase tracking-widest text-white mb-1">
+              Initialize Project Broadcast
+            </h1>
+            <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">
+              Provide constraints and requirements for your new collaboration node.
+            </p>
+          </div>
 
           {error && (
-            <div className="bg-red-500/10 border border-red-500 text-red-500 p-3 rounded-lg mb-6 text-sm">
-              {error}
+            <div className="bg-red-500/10 border border-red-500 text-red-500 p-3 rounded mb-6 text-[10px] uppercase font-bold tracking-widest">
+              SYS_ERROR: {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-zinc-500">
-                Project Title
+              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 border-l-2 border-[#5865F2] pl-2 block">
+                Project Title String
               </label>
               <input
                 type="text"
                 placeholder="e.g. AI-Powered Campus Map"
-                className="w-full bg-[#272729] border border-[#343536] rounded-lg py-3 px-4 text-white outline-none focus:border-red-500 transition-all"
+                className="w-full bg-[#161b22] border border-[#2d333b] rounded py-2.5 px-4 text-xs font-medium text-white placeholder:text-zinc-600 outline-none focus:border-[#5865F2]/50 focus:bg-[#1f242c] transition-all"
                 onChange={(e) =>
                   setFormData({ ...formData, title: e.target.value })
                 }
@@ -105,13 +103,13 @@ export default function NewProject() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-zinc-500">
-                Detailed Description
+              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 border-l-2 border-[#5865F2] pl-2 block">
+                Detailed Blob Description
               </label>
               <textarea
-                placeholder="Explain the goals, current progress, and why people should join..."
+                placeholder="Explain the goals, current progress, and why peers should sync with this signal..."
                 rows={6}
-                className="w-full bg-[#272729] border border-[#343536] rounded-lg py-3 px-4 text-white outline-none focus:border-red-500 transition-all resize-none"
+                className="w-full bg-[#161b22] border border-[#2d333b] rounded py-2.5 px-4 text-xs font-medium text-white placeholder:text-zinc-600 outline-none focus:border-[#5865F2]/50 focus:bg-[#1f242c] transition-all resize-none"
                 onChange={(e) =>
                   setFormData({ ...formData, description: e.target.value })
                 }
@@ -120,31 +118,31 @@ export default function NewProject() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-zinc-500">
-                Requirements
+              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 border-l-2 border-[#5865F2] pl-2 block">
+                Required Skill Vectors
               </label>
               <input
                 type="text"
-                placeholder="React, FastAPI, Python, UI/UX (comma separated)"
-                className="w-full bg-[#272729] border border-[#343536] rounded-lg py-3 px-4 text-white outline-none focus:border-red-500 transition-all"
+                placeholder="React, FastAPI, Python (comma separated)"
+                className="w-full bg-[#161b22] border border-[#2d333b] rounded py-2.5 px-4 text-xs font-medium text-white placeholder:text-zinc-600 outline-none focus:border-[#5865F2]/50 focus:bg-[#1f242c] transition-all uppercase tracking-wider"
                 onChange={(e) =>
                   setFormData({ ...formData, requirements: e.target.value })
                 }
                 required
               />
-              <p className="text-[10px] text-zinc-600 italic">
-                Separate each skill or tool with a comma.
+              <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest mt-1">
+                Note: Separate each node vector with a comma separator.
               </p>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className={`w-full py-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-full transition-all mt-4 ${
-                loading ? "opacity-50 cursor-not-allowed" : ""
+              className={`w-full py-3 mt-8 bg-[#5865F2]/10 hover:bg-[#5865F2]/20 border border-[#5865F2]/30 text-[#5865F2] hover:text-white font-black text-xs uppercase tracking-widest rounded transition-all ${
+                loading ? "opacity-50 cursor-not-allowed pointer-events-none" : ""
               }`}
             >
-              {loading ? "Publishing..." : "Post Project to Hub"}
+              {loading ? "Transmitting..." : "Broadcast Payload"}
             </button>
           </form>
         </div>

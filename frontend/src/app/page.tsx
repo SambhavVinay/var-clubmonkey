@@ -188,7 +188,7 @@ const Page = () => {
 
         {/* Starfield Background Layer (only stars, no gradients/shaders) */}
         <div className="pointer-events-none absolute inset-0 z-[1] overflow-hidden">
-          {stars.map((star, index) => (
+          {mounted && stars.map((star, index) => (
             <span
               key={index}
               className="star-twinkle absolute rounded-full"

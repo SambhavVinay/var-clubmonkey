@@ -7,7 +7,13 @@ import { motion, AnimatePresence } from "motion/react";
 import Carousel, { type CarouselItem } from "@/components/Carousel";
 import TinyToast from "@/components/TinyToast";
 import PostCard from "@/components/PostCard";
-import { FiAperture, FiHeart, FiPlusSquare, FiSmile, FiUsers } from "react-icons/fi";
+import {
+  FiAperture,
+  FiHeart,
+  FiPlusSquare,
+  FiSmile,
+  FiUsers,
+} from "react-icons/fi";
 
 interface Club {
   id: number;
@@ -144,13 +150,12 @@ export default function Dashboard() {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return [];
 
-    const feedMatches = FEED_ITEMS
-      .filter(
-        (item) =>
-          item.title.toLowerCase().includes(query) ||
-          item.author.toLowerCase().includes(query) ||
-          item.category.toLowerCase().includes(query)
-      )
+    const feedMatches = FEED_ITEMS.filter(
+      (item) =>
+        item.title.toLowerCase().includes(query) ||
+        item.author.toLowerCase().includes(query) ||
+        item.category.toLowerCase().includes(query),
+    )
       .slice(0, 4)
       .map((item) => ({
         id: `feed-${item.id}`,
@@ -164,7 +169,7 @@ export default function Dashboard() {
         (club) =>
           club.name.toLowerCase().includes(query) ||
           club.description?.toLowerCase().includes(query) ||
-          club.tags?.some((tag) => tag.toLowerCase().includes(query))
+          club.tags?.some((tag) => tag.toLowerCase().includes(query)),
       )
       .slice(0, 4)
       .map((club) => ({
@@ -179,7 +184,7 @@ export default function Dashboard() {
       .filter(
         (user) =>
           user.name.toLowerCase().includes(query) ||
-          user.email.toLowerCase().includes(query)
+          user.email.toLowerCase().includes(query),
       )
       .slice(0, 3)
       .map((user) => ({
@@ -193,12 +198,16 @@ export default function Dashboard() {
   }, [allClubs, searchQuery, users]);
 
   const fypPosts = useMemo(() => {
-    const userSession = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("user") || "{}") : {};
+    const userSession =
+      typeof window !== "undefined"
+        ? JSON.parse(localStorage.getItem("user") || "{}")
+        : {};
     const recommendedIds = recommendedClubs.map((c) => c.id);
     const adminClubId = userSession.admin_of_club_id;
 
     return posts.filter(
-      (post) => recommendedIds.includes(post.club_id) || post.club_id === adminClubId
+      (post) =>
+        recommendedIds.includes(post.club_id) || post.club_id === adminClubId,
     );
   }, [posts, recommendedClubs]);
 
@@ -206,18 +215,18 @@ export default function Dashboard() {
 
   const similarPeers = useMemo(() => {
     if (!currentUserId || !users.length) return [];
-    
+
     // Find current user's preferences from the fetched users list
-    const currentUser = users.find(u => u.id === currentUserId);
+    const currentUser = users.find((u) => u.id === currentUserId);
     const myPrefs = currentUser?.preferences || [];
-    
+
     if (myPrefs.length === 0) return [];
 
-    return users.filter(user => {
+    return users.filter((user) => {
       if (user.id === currentUserId) return false;
       if (!user.preferences || user.preferences.length === 0) return false;
       // Intersection check
-      return user.preferences.some(pref => myPrefs.includes(pref));
+      return user.preferences.some((pref) => myPrefs.includes(pref));
     });
   }, [users, currentUserId]);
 
@@ -238,18 +247,23 @@ export default function Dashboard() {
       return;
     }
     setCurrentUserId(userSession.id);
-    const savedFollowState = localStorage.getItem(`clubmonkey:follows:${userSession.id}`);
+    const savedFollowState = localStorage.getItem(
+      `clubmonkey:follows:${userSession.id}`,
+    );
     if (savedFollowState) {
       setFollowedUserIds(JSON.parse(savedFollowState));
     }
 
-    const savedUpvoteState = localStorage.getItem(`clubmonkey:postUpvotes:${userSession.id}`);
+    const savedUpvoteState = localStorage.getItem(
+      `clubmonkey:postUpvotes:${userSession.id}`,
+    );
     if (savedUpvoteState) {
       setUpvotes(JSON.parse(savedUpvoteState));
     }
 
     const onboardingSeen =
-      localStorage.getItem(`clubmonkey:onboardingSeen:${userSession.id}`) === "true";
+      localStorage.getItem(`clubmonkey:onboardingSeen:${userSession.id}`) ===
+      "true";
     if (!onboardingSeen) {
       setShowOnboarding(true);
     }
@@ -331,7 +345,10 @@ export default function Dashboard() {
 
   const closeOnboarding = () => {
     if (currentUserId) {
-      localStorage.setItem(`clubmonkey:onboardingSeen:${currentUserId}`, "true");
+      localStorage.setItem(
+        `clubmonkey:onboardingSeen:${currentUserId}`,
+        "true",
+      );
     }
     setShowOnboarding(false);
   };
@@ -344,11 +361,16 @@ export default function Dashboard() {
         : [...prev, userId];
 
       if (currentUserId) {
-        localStorage.setItem(`clubmonkey:follows:${currentUserId}`, JSON.stringify(next));
+        localStorage.setItem(
+          `clubmonkey:follows:${currentUserId}`,
+          JSON.stringify(next),
+        );
       }
 
       setToastTone(wasFollowing ? "info" : "success");
-      setToastMessage(wasFollowing ? `Unfollowed u/${userName}` : `Following u/${userName}`);
+      setToastMessage(
+        wasFollowing ? `Unfollowed u/${userName}` : `Following u/${userName}`,
+      );
 
       return next;
     });
@@ -367,7 +389,7 @@ export default function Dashboard() {
       const next = { ...prev, [key]: wasUpvoted ? 0 : 1 };
       localStorage.setItem(
         `clubmonkey:postUpvotes:${currentUserId}`,
-        JSON.stringify(next)
+        JSON.stringify(next),
       );
       setToastTone(wasUpvoted ? "info" : "success");
       setToastMessage(wasUpvoted ? "Upvote removed" : "Post upvoted");
@@ -383,7 +405,9 @@ export default function Dashboard() {
       <div className="flex h-screen items-center justify-center bg-[#030303] text-zinc-400">
         <div className="flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-5 py-2.5 backdrop-blur-sm">
           <span className="h-2 w-2 animate-pulse rounded-full bg-blue-500" />
-          <span className="text-xs font-bold uppercase tracking-widest">Initialising ClubMonkey...</span>
+          <span className="text-xs font-bold uppercase tracking-widest">
+            Initialising ClubMonkey...
+          </span>
         </div>
       </div>
     );
@@ -392,11 +416,11 @@ export default function Dashboard() {
     <div className="relative min-h-screen bg-[#030303] text-zinc-200 overflow-x-hidden">
       {/* Sleek industrial background grid */}
       <div className="pointer-events-none fixed inset-0 z-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
-      
+
       <header className="sticky top-0 z-50 border-b border-[#2d333b] bg-[#030303]/90 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-[1320px] items-center gap-4 px-4 md:px-6">
           <div className="text-xl font-black tracking-tighter text-white uppercase italic">
-            <span>VAR</span>.MONKEY
+            <span>Club</span>Monkey
           </div>
 
           <div className="mx-auto flex w-full max-w-2xl items-center gap-3">
@@ -434,7 +458,9 @@ export default function Dashboard() {
                             type="button"
                             onClick={() => handleSelectSuggestion(suggestion)}
                             className={`flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors ${
-                              index === activeSuggestionIndex ? "bg-[#5865F2]/20 border-l-2 border-[#5865F2]" : "hover:bg-white/5"
+                              index === activeSuggestionIndex
+                                ? "bg-[#5865F2]/20 border-l-2 border-[#5865F2]"
+                                : "hover:bg-white/5"
                             }`}
                           >
                             <span className="mt-0.5 inline-block rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-zinc-400">
@@ -499,8 +525,16 @@ export default function Dashboard() {
               </h2>
               <nav className="flex flex-col gap-1">
                 {[
-                  { label: "Feed", active: activeFeedTab === "all", onClick: () => setActiveFeedTab("all") },
-                  { label: "For You", active: activeFeedTab === "fyp", onClick: () => setActiveFeedTab("fyp") },
+                  {
+                    label: "Feed",
+                    active: activeFeedTab === "all",
+                    onClick: () => setActiveFeedTab("all"),
+                  },
+                  {
+                    label: "For You",
+                    active: activeFeedTab === "fyp",
+                    onClick: () => setActiveFeedTab("fyp"),
+                  },
                   { label: "Popular", active: false },
                   { label: "All Clubs", active: false },
                 ].map((item) => (
@@ -508,7 +542,9 @@ export default function Dashboard() {
                     key={item.label}
                     onClick={item.onClick}
                     className={`flex items-center px-3 py-2 text-[11px] font-bold uppercase transition-all rounded ${
-                      item.active ? "bg-[#5865F2]/10 text-[#5865F2] border border-[#5865F2]/20 shadow-[0_0_15px_-5px_rgba(88,101,242,0.4)]" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                      item.active
+                        ? "bg-[#5865F2]/10 text-[#5865F2] border border-[#5865F2]/20 shadow-[0_0_15px_-5px_rgba(88,101,242,0.4)]"
+                        : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
                     }`}
                   >
                     {item.label}
@@ -528,12 +564,17 @@ export default function Dashboard() {
                       className="dashboard-item-enter flex cursor-pointer items-center gap-2 p-2 hover:bg-[#161b22] transition-all group"
                       style={{ animationDelay: `${80 + index * 20}ms` }}
                     >
-                      <img 
-                        src={club.logo_url || `https://api.dicebear.com/7.x/initials/svg?seed=${club.name}`} 
-                        className="h-5 w-5 rounded-sm object-cover filter grayscale group-hover:grayscale-0 transition-all border border-[#2d333b]" 
+                      <img
+                        src={
+                          club.logo_url ||
+                          `https://api.dicebear.com/7.x/initials/svg?seed=${club.name}`
+                        }
+                        className="h-5 w-5 rounded-sm object-cover filter grayscale group-hover:grayscale-0 transition-all border border-[#2d333b]"
                         alt=""
                       />
-                      <span className="text-[11px] font-bold text-zinc-500 group-hover:text-zinc-200 transition-colors">r/{club.name}</span>
+                      <span className="text-[11px] font-bold text-zinc-500 group-hover:text-zinc-200 transition-colors">
+                        r/{club.name}
+                      </span>
                     </div>
                   </Link>
                 ))}
@@ -573,14 +614,15 @@ export default function Dashboard() {
             ) : (
               <div className="dashboard-card p-12 text-center flex flex-col items-center justify-center space-y-4">
                 <div className="w-16 h-16 rounded border border-dashed border-[#2d333b] flex items-center justify-center text-zinc-600 text-2xl font-black italic">
-                   !
+                  !
                 </div>
                 <div className="space-y-1">
                   <p className="text-zinc-400 text-xs font-black uppercase tracking-widest">
                     SYNC_ERROR: NO_CONTENT
                   </p>
                   <p className="text-zinc-600 text-[10px] uppercase font-bold">
-                    System could not retrieve active signals for this feed vector
+                    System could not retrieve active signals for this feed
+                    vector
                   </p>
                 </div>
               </div>
@@ -605,10 +647,13 @@ export default function Dashboard() {
                   >
                     <div className="flex items-start gap-3">
                       <div className="h-10 w-10 shrink-0 rounded border border-[#2d333b] overflow-hidden filter grayscale group-hover:grayscale-0 transition-all">
-                        <img 
-                          src={club.logo_url || `https://api.dicebear.com/7.x/initials/svg?seed=${club.name}`} 
-                          alt="" 
-                          className="h-full w-full object-cover" 
+                        <img
+                          src={
+                            club.logo_url ||
+                            `https://api.dicebear.com/7.x/initials/svg?seed=${club.name}`
+                          }
+                          alt=""
+                          className="h-full w-full object-cover"
                         />
                       </div>
                       <div className="flex-1">
@@ -623,7 +668,9 @@ export default function Dashboard() {
                   </Link>
                 ))
               ) : (
-                <p className="text-[10px] font-bold text-zinc-600 text-center uppercase">No Network Recommendations</p>
+                <p className="text-[10px] font-bold text-zinc-600 text-center uppercase">
+                  No Network Recommendations
+                </p>
               )}
             </div>
           </div>
@@ -635,45 +682,52 @@ export default function Dashboard() {
             <div className="flex flex-col gap-2">
               {similarPeers.length > 0 ? (
                 similarPeers.map((user, index) => (
-                <div
-                  key={user.id}
-                  className="dashboard-card p-3 border-[#2d333b] hover:border-[#5865F2]/40 transition-all flex items-center justify-between"
-                  style={{ animationDelay: `${240 + index * 26}ms` }}
-                >
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={user.image || `https://api.dicebear.com/7.x/pixel-art/svg?seed=${user.name}`}
-                      className="h-8 w-8 rounded-sm bg-[#161b22] border border-[#2d333b] grayscale"
-                      alt=""
-                    />
-                    <div className="min-w-0">
-                      <p className="truncate text-[11px] font-black text-white uppercase tracking-tighter">
-                        u/{user.name}
-                      </p>
-                      <p className="truncate text-[9px] font-medium text-zinc-500 uppercase">
-                        {user.preferences?.slice(0, 2).join(" • ") || "No Meta"}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleFollowToggle(user.id, user.name); }}
-                    className={`rounded px-2 py-1 text-[9px] font-black uppercase tracking-widest transition-all ${
-                      followedUserIds.includes(user.id)
-                        ? "bg-[#2d333b] text-zinc-300"
-                        : "bg-[#5865F2]/10 text-[#5865F2] border border-[#5865F2]/20 hover:bg-[#5865F2]/20"
-                    }`}
+                  <div
+                    key={user.id}
+                    className="dashboard-card p-3 border-[#2d333b] hover:border-[#5865F2]/40 transition-all flex items-center justify-between"
+                    style={{ animationDelay: `${240 + index * 26}ms` }}
                   >
-                    {followedUserIds.includes(user.id) ? "Synced" : "Sync"}
-                  </button>
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={
+                          user.image ||
+                          `https://api.dicebear.com/7.x/pixel-art/svg?seed=${user.name}`
+                        }
+                        className="h-8 w-8 rounded-sm bg-[#161b22] border border-[#2d333b] grayscale"
+                        alt=""
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate text-[11px] font-black text-white uppercase tracking-tighter">
+                          u/{user.name}
+                        </p>
+                        <p className="truncate text-[9px] font-medium text-zinc-500 uppercase">
+                          {user.preferences?.slice(0, 2).join(" • ") ||
+                            "No Meta"}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleFollowToggle(user.id, user.name);
+                      }}
+                      className={`rounded px-2 py-1 text-[9px] font-black uppercase tracking-widest transition-all ${
+                        followedUserIds.includes(user.id)
+                          ? "bg-[#2d333b] text-zinc-300"
+                          : "bg-[#5865F2]/10 text-[#5865F2] border border-[#5865F2]/20 hover:bg-[#5865F2]/20"
+                      }`}
+                    >
+                      {followedUserIds.includes(user.id) ? "Synced" : "Sync"}
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="dashboard-card p-6 text-center border-dashed border-[#2d333b]">
+                  <p className="text-[10px] text-zinc-600 font-bold uppercase italic">
+                    NO_SIMILARITY_DETECTED
+                  </p>
                 </div>
-              ))
-            ) : (
-              <div className="dashboard-card p-6 text-center border-dashed border-[#2d333b]">
-                <p className="text-[10px] text-zinc-600 font-bold uppercase italic">
-                  NO_SIMILARITY_DETECTED
-                </p>
-              </div>
-            )}
+              )}
             </div>
           </div>
         </section>
@@ -704,24 +758,29 @@ export default function Dashboard() {
                     {selectedPost.club_name.substring(0, 1)}
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-xs font-black uppercase tracking-widest text-white">r/{selectedPost.club_name}</span>
-                    <span className="text-[10px] text-zinc-500 uppercase tracking-tighter">Signal Broadcasted at {new Date(selectedPost.created_at).toLocaleTimeString()}</span>
+                    <span className="text-xs font-black uppercase tracking-widest text-white">
+                      r/{selectedPost.club_name}
+                    </span>
+                    <span className="text-[10px] text-zinc-500 uppercase tracking-tighter">
+                      Signal Broadcasted at{" "}
+                      {new Date(selectedPost.created_at).toLocaleTimeString()}
+                    </span>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={closePostDetail}
                   className="rounded-full h-8 w-8 flex items-center justify-center bg-white/5 hover:bg-white/10 text-zinc-400 transition-all border border-white/5"
                 >
                   ✕
                 </button>
               </div>
-              
+
               <div className="p-8 space-y-8">
                 <div className="space-y-4">
-                   <h2 className="text-2xl font-black text-white leading-tight">
+                  <h2 className="text-2xl font-black text-white leading-tight">
                     {selectedPost.content.substring(0, 60)}...
-                   </h2>
-                   <div className="h-[2px] w-24 bg-[#5865F2] ml-1" />
+                  </h2>
+                  <div className="h-[2px] w-24 bg-[#5865F2] ml-1" />
                 </div>
 
                 <p className="text-lg text-zinc-300 leading-relaxed font-medium whitespace-pre-wrap">
@@ -730,19 +789,21 @@ export default function Dashboard() {
 
                 {selectedPost.image_url && (
                   <div className="rounded-lg border border-[#2d333b] overflow-hidden bg-black/50 shadow-inner">
-                    <img 
-                      src={selectedPost.image_url} 
-                      className="w-full h-auto object-contain max-h-[600px]" 
-                      alt="" 
+                    <img
+                      src={selectedPost.image_url}
+                      className="w-full h-auto object-contain max-h-[600px]"
+                      alt=""
                     />
                   </div>
                 )}
 
                 <div className="flex items-center gap-6 pt-10 border-t border-[#2d333b]">
-                  <button 
+                  <button
                     onClick={() => handleUpvoteToggle(selectedPost.id)}
                     className={`flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] transition-all px-4 py-2 rounded border ${
-                      Boolean(upvotes[`${selectedPost.club_id}:${selectedPost.id}`])
+                      Boolean(
+                        upvotes[`${selectedPost.club_id}:${selectedPost.id}`],
+                      )
                         ? "bg-[#5865F2] text-white border-[#5865F2]"
                         : "border-[#2d333b] text-zinc-500 hover:border-[#5865F2]/50 hover:text-white"
                     }`}
@@ -758,9 +819,13 @@ export default function Dashboard() {
                 </div>
 
                 <div className="pt-8 space-y-4 opacity-50">
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Comments: coming_soon.exe</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">
+                    Comments: coming_soon.exe
+                  </p>
                   <div className="h-20 w-full border border-dashed border-[#2d333b] rounded flex items-center justify-center">
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-700">Encrypted Communication Thread Offline</span>
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-700">
+                      Encrypted Communication Thread Offline
+                    </span>
                   </div>
                 </div>
               </div>
@@ -834,7 +899,7 @@ export default function Dashboard() {
         }
 
         .dashboard-card-hover:hover {
-          border-color: #5865F266;
+          border-color: #5865f266;
           background: #161b22;
         }
 
