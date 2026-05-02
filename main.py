@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, Column, String, Integer, Text, ForeignKey, JSON, DateTime, Boolean
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.sql import func
@@ -266,7 +267,15 @@ def delete_post(post_id: int, db: Session = Depends(get_db)):
 def google_auth(data: GoogleAuthRequest, db: Session = Depends(get_db)):
     try:
         # Verify using Firebase Admin
-        decoded_token = firebase_auth.verify_id_token(data.token)
+        decoded_token = firebase_auth.verify_id_token(data.token, clock_skew_seconds=10)
+    except Exception as e:
+        print(f"Firebase token verification error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid Firebase Token: {str(e)}"
+        )
+
+    try:
         
         google_id = decoded_token['uid']
         email = decoded_token['email'].lower() # Consistency is key
@@ -300,13 +309,26 @@ def google_auth(data: GoogleAuthRequest, db: Session = Depends(get_db)):
         
         return user
 
-    except Exception as e:
-        print(f"Auth Error: {e}")
-        # If it's failing here, it's a token verification issue. 
-        # Make sure your Firebase Admin 'service-account.json' matches your frontend Firebase Project.
+    except OperationalError as e:
+        db.rollback()
+        print(f"Database operational error during auth: {e}")
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid Firebase Token: {str(e)}"
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database connection failed while signing in. Please try again."
+        )
+    except SQLAlchemyError as e:
+        db.rollback()
+        print(f"Database error during auth: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error while signing in."
+        )
+    except Exception as e:
+        db.rollback()
+        print(f"Unexpected auth error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected error while signing in."
         )
 
 
